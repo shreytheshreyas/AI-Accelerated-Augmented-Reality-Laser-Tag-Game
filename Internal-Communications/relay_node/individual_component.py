@@ -8,7 +8,7 @@ import time
 
 
 #Respond Message Buffer size
-RESPONSE_BUFFER_SIZE = 3
+RESPONSE_BUFFER_SIZE = 3 #Need to update to 6 to accomodate two players
 DATA_BUFFER_SIZE = 20
 
 #BLUNO ID's for the respective players 
@@ -39,9 +39,9 @@ MAC_ADDRESSES = {
 }
 
 class BufferManager:
-    synchronizationBuffer = [False] * RESPONSE_BUFFER_SIZE
-    acknowledgementBuffer = [False] * RESPONSE_BUFFER_SIZE
-    negativeAcknowledgementBuffer = [False] * RESPONSE_BUFFER_SIZE
+    synchronizationBuffer = [False] * RESPONSE_BUFFER_SIZE #Used for synchronization 
+    acknowledgementBuffer = [False] * RESPONSE_BUFFER_SIZE #Used for data transfer
+    negativeAcknowledgementBuffer = [False] * RESPONSE_BUFFER_SIZE #Used for Data transfer
     commonDataBuffer = Queue(DATA_BUFFER_SIZE)
 
     def flip_sync_status(cls, bettle_id):
@@ -91,9 +91,10 @@ class BluetoothInterfaceHandler(DefaultDelegate):
 
         if len(self.receivingBuffer) == 1 and self.receivingBuffer.decode(encoding='ascii') == 'A':
             logging.info(f'ACK received from beetle-{self.beetleId} successfully')
-            
+            BufferManger.flip_sync_status(self.beetleId)
+
         elif len(self.receivingBuffer) <= 20:
-            pass
+                pass
         else: #Dealing with the case where data spans across multiple packets
             pass
 
@@ -118,7 +119,7 @@ class BlunoDevice:
                 self.peripheral.setDelegate(self.bluetoothInterfaceHandler)
                 #logging.info(self.peripheral.getCharacteristics())
                 logging.info(f'Connection successfully established between the beetle-{self.beetleId} and relay node.')
-                self.peripheral.waitForNotifications(1)
+                #self.peripheral.waitForNotifications(1)
                 logging.info('finished waiting for notifications')
                 break
             except Exception as e:
@@ -126,38 +127,50 @@ class BlunoDevice:
                 break
     
     def transmit_data(self, data):
-        pass
-    
-    def handshake_mechanism(self, isHandshakeCompleted):
-        
-        ##Acuring buffer lock for each repestive thread so th
-        while not isHandshakeCompleted:
-            if not BufferManager.get_sync_status(self.beetle_id):
-                self.transmit_data(SYN)
-                ### Assuming transmission medium and 100% reliable and no possibilty of packet loss
-                BufferManager.flip_sycn_status(self.beetle_id)
-            
-            elif BufferManager.get_ack_status(self.beetle_id):
-                BufferManager.flip_ack_status(self.beetle_id)
-                BufferManager.flip_sync_status(self.beetle_id)
-                isHandshakeCompleted = True 
-            
-            else:
-                continue
+        try:
+            serialService = self.peripheral.getServiceByUUID(GATT_SERVICE_UUID)
+            serialServiceChararacteristics = serialService.getCharacteristics(serialService)
 
+            for characteristic in serialServiceCharacteristics:
+                if characteristic == GATT_WRITE_CHARACTERISTIC_UUID:
+                    characteristic.write(bytes(data, 'ascii'), withResponse=True)
+                    logging.info(f'data transmitted over to beetle-{self.beetleId}')
+
+        except Exception as e:
+            logging.info(f'Service associated with the given service uuid does not exist. Exception is as follows: \n {e}')
+        
+    def handshake_mechanism(self, isHandshakeCompleted):
+        while not isHandshakeCompleted:
+            logging.info(f'Still in handshaking mechanism for beetle-{self.beetleId}')
+            if not BufferManager.get_sync_status(self.beetle_id):
+                #Step-1: Transmit synchronization packet from relay node 
+                self.transmit_data(SYN)
+                #Step-2: Wait for ACK from peripheral to make sure it received the SYN packet
+                self.peripheral.waitForNotifications(1.0) 
+            else:    
+                #Step-3: Flip synchronization flag for the associated beetle to a intital state
+                BufferManager.flip_sync_status(self.beetle_id)
+                #Step-4: set handshake 
+                isHandshakeCompleted = True 
+        
+        logging.info(f'Handshake established with beetle-{self.beetle.Id}')
         return isHandshakeCompleted
     
-    def transmission_protocol():
+    def reys_transmission_protocol():
         isHandshakeCompleted = False
         while True: 
             if not isHandshakeCompleted:
                 #1. Connect/Reconnect to bettle 
-                self.establish_connect(self.beetle_id)
-                #2. Send Synchronization packet
+                self.establish_connection(self.beetle_id)
+                #2. perform handshake mechanism 
                 isHandshakeCompleted = self.handshake_mechanism(isHandshakeCompleted)
                 #3. Wait for ACK from bluno
                 #4. If ACK is received from bluno, send an ACK from your end as well 
-                            
+            else:
+                pass
+                #regular data transfer
+
+
     def dummy(self, text):
         print(f'This message is from {text}')
 
