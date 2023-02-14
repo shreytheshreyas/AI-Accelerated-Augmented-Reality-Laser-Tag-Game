@@ -1,3 +1,5 @@
+#include "CRC8.h"
+
 #define DATA_RATE 115200 //Defining datarate to be 115200 baud
 #define PACKET_SIZE 20 //Defining packet size to be 20 bytes
 
@@ -8,41 +10,136 @@
 #define SEQUENCE_NUMBER 1
 #define PACKET_TYPE 2
 
-#define ACK 'A' //The letter 'A' corresponds to the ASCII code 65
-#define SYN 'S'
+//BEETLE_IDs
+#define PLAYER_1_TRANSMITTER 0
+#define PLAYER_1_RECEIVER 1
+#define PLAYER_1_IMU 2
+#define PLAYER_2_TRANSMITTER 3
+#define PLAYER_2_RECEIVER 4
+#define PLAYER_2_IMU 5
+#define TEST_TRANSMITTER 6
+#define TEST_RECEIVER 7
+#define TEST_IMU 8
 
-class Packet {
+//PACKET TYPES
+#define GUN 'G'
+#define VEST 'V'
+#define IMU 'I'
+#define ACK 'A' //The letter 'A' corresponds to the ASCII code 65
+#define NACK 'N'
+#define SYN 'S'
+#define DATA 'D' //Data response from the relay node 
+CRC8 crc;
+byte dataPacket[PACKET_SIZE];
+int sequenceNumber = 0;
+
+//timer values for time out functionality of protocol
+bool isTimerStarted  = true; //In reality the default value will be false and will be updated by an interrupt, when the gun trigger is pressed
+bool canSendData = true; // state will be changed by an interrrupt
+long timeoutValue = 1000;
+long transmissionStartTime = 0;
+
+typedef struct PacketStructure {
+  uint8_t beetleId;
+  uint8_t sequenceNumber;
+  uint8_t packetType;
+  uint8_t payload_1;
+  uint8_t payload_2;
+  uint8_t payload_3;
+  uint8_t payload_4;
+  uint8_t payload_5;
+  uint8_t payload_6;
+  uint8_t payload_7;
+  uint8_t payload_8;
+  uint8_t payload_9;
+  uint8_t payload_10;
+  uint8_t payload_11;
+  uint8_t payload_12;
+  uint8_t payload_13;
+  uint8_t payload_14;
+  uint8_t payload_15;
+  uint8_t payload_16;
+  uint8_t crcValue;
+};
+
+class GunPacketData{
   private:
-    float imu_gx;
-    float imu_gy;
-    float imu_gz;
-    float imu_ax;
-    float imu_ay;
-    float imu_az;
-    
-    uint8_t packet_message[20];
+    PacketStructure packet;
+    int address;
+    int command;
   public:
-    void getImuData();
-    void getGunData();
-    void getVestData();
-    
-    Packet() {
-      getImuData();
-      getGunData();
-      getVestData();
-      
-      packet_message[BEETLE_ID] = BEETLE_DEVICE;
-      packet_message[SEQUENCE_NUMBER] = BEETLE_DEVICE;
-      for(int i = 0; i < PACKET_SIZE; i++) 
-        packet_message[i] = 0;
+
+    GunPacketData() {
+      address = 0;
+      command = 0;
     }
     
-    Packet(uint8_t packetType) {
-      packet_message[BEET
+    void setGunData() {
+      packet.beetleId = (uint8_t) TEST_TRANSMITTER;
+      packet.sequenceNumber = (uint8_t) sequenceNumber;
+      packet.packetType = (uint8_t) GUN;
+      packet.payload_1 = (uint8_t) 0;
+      packet.payload_2 = (uint8_t) 0;
+      packet.payload_3 = (uint8_t) 0;
+      packet.payload_4 = (uint8_t) 0;
+      packet.payload_5 = (uint8_t) 0;
+      packet.payload_6 = (uint8_t) 0;
+      packet.payload_7 = (uint8_t) 0;
+      packet.payload_8 = (uint8_t) 0;
+      packet.payload_9 = (uint8_t) 0;
+      packet.payload_10 = (uint8_t) 0;
+      packet.payload_11 = (uint8_t) 0;
+      packet.payload_12 = (uint8_t) 0;
+      packet.payload_13 = (uint8_t) 0;
+      packet.payload_14 = (uint8_t) 0;
+      packet.payload_15 = (uint8_t) 0;
+      packet.payload_16 = (uint8_t) 1;
+
+      //calcualting crc8 value 
+      crc.add(packet.beetleId);
+      crc.add(packet.sequenceNumber);
+      crc.add(packet.packetType);
+      crc.add(packet.payload_1);
+      crc.add(packet.payload_2);
+      crc.add(packet.payload_3);
+      crc.add(packet.payload_4);
+      crc.add(packet.payload_5);
+      crc.add(packet.payload_6);
+      crc.add(packet.payload_7);
+      crc.add(packet.payload_8);
+      crc.add(packet.payload_9);
+      crc.add(packet.payload_10);
+      crc.add(packet.payload_11);
+      crc.add(packet.payload_12);
+      crc.add(packet.payload_13);
+      crc.add(packet.payload_14);
+      crc.add(packet.payload_15);
+      crc.add(packet.payload_16);
+
+      //storing crc value in last byte of packet
+      packet.crcValue = crc.getCRC();
+
+      //Updating Sequence after storing packet details 
+      sequenceNumber++;
+      sequenceNumber %= 255;
+      }
+
+      void transmitPacket() {
+        Serial.write((uint8_t*)&packet, sizeof(packet));
+      }
 };
 
 
-class ImuDataPacket: public Packet {
+class VestDataPacket{
+  private:
+    int address;
+    int command;
+
+    public:
+//      void 
+ };
+
+class ImuDataPacket{
   private: 
     float gx;
     float gy;
@@ -53,54 +150,54 @@ class ImuDataPacket: public Packet {
     
   public:
     void getImuData();
-    ImuDataPacket() {
-      this.getImuData();
-      this.Packet('I')
-    }
+//    ImuDataPacket() {
+//      this.getImuData();
+//      this.Packet('I')
+//    }
 };
 
-class GunDataPacket: public Packet {
-  private:
-    int address;
-    int command;
 
-  public:
-    void getGunData();
-    GunDataPacket() {
-      this.getGunData();
-      this.  
-    }
-};
-
-class VestDataPacket: public Packet {
-  private:
-    int address;
-    int command;
-
-    public:
-      void 
- };
- class 
 class ReysProtocol {
   private:
   bool isHandshake;
-//  Packet dataPacket;
+  GunPacketData *packet;
 
   public:
 
   ReysProtocol() {
   isHandshake = false;
-//  dataPacket = new Packet() 
+  packet = new GunPacketData();
+//  vestDataPacket = new  VestDataPacket();
+//  imuDataPacket = new imuDataPacket();
   }
 
+  void clearBuffer() { 
+  }
+  
   void start() {
+    uint8_t relayNodePacket = Serial.read();
       if(isHandshake) {
-        Serial.println("Handshake with relay node completed");
+        if( (millis() - transmissionStartTime > timeoutValue) && canSendData && isTimerStarted) {
+              packet->setGunData();
+              packet->transmitPacket();
+              canSendData = false;
+              transmissionStartTime = millis();
+          } 
+          else if (relayNodePacket == ACK) {
+              canSendData = true;
+              isTimerStarted = false; //start timer value will be set to true using an interrupt
+              relayNodePacket = (uint8_t) 0;
+          } 
+          else if (relayNodePacket == NACK) {
+            //State variables modified to allow transmission of the corrupted packet again
+            canSendData = true;
+            isTimerStarted = true;
+            transmissionStartTime = 0;
+            relayNodePacket = (uint8_t) 0;
+          }
       }  
 
       else {
-        byte relayNodePacket = Serial.read();
-
         if(relayNodePacket == SYN)
           Serial.write(ACK);
 
@@ -111,58 +208,8 @@ class ReysProtocol {
 
 };
 
-byte dataPacket[PACKET_SIZE];
-int sequenceNumber = 0;
+
 ReysProtocol* protocol;
-
-//dummy variables 
-//bool condition = false;
-
-void create_data_packet(float data) {
-	//TODO: Need to define code over here
-}
-
-
-void send_dummy_packet() {
-
-  Serial.write("100");
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-//  Serial.write(0);
-}
-
-//void handshake_mechanism(bool isHandShakeComplete) {
-//	int receivedData = Serial.read();
-//	bool completionStatus = false;
-//
-//	//If received packet is 'S', create ACK packet and send to the relay node
-//	if(receivedData == 83) 
-//		Serial.write(ACK);
-//	
-//	//If received packet is 'A' set complettionStatus to True
-//	if(receivedData == 65)
-//		completionStatus = true;
-//	
-//	
-//	return completionStatus;
-//}
 
 void setup(void) {
   Serial.begin(115200);
