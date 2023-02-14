@@ -29,7 +29,6 @@ def put_actions(action_queue):
         [
             "p1_hit",
             "p2_shoot",
-            "p1_reload",
         ],
         [
             "p1_hit",
@@ -67,7 +66,6 @@ def put_actions(action_queue):
     ]
 
     for turn in turns:
-        time.sleep(2)
         for x in turn:
             time.sleep(0.5)
             player, action = x.split("_")
@@ -77,6 +75,8 @@ def put_actions(action_queue):
                 opp_in_frames[1] = 0
             action_queue.put((player, action))
             eval_resp_queue.put(init_json)
+
+        time.sleep(3)
 
 
 engine_process = mp.Process(target=engine.run)

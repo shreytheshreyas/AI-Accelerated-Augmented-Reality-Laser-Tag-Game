@@ -1,10 +1,11 @@
 import json
 import time
+from base64 import encode
 
 from GameState import GameState
 from Helper import Actions
 
-TURN_MAX_TIME = 10
+TURN_MAX_TIME = 3
 
 
 class GameEngine:
@@ -19,7 +20,7 @@ class GameEngine:
         self.opp_in_frames = opp_in_frames
         self.signals = {}
         self.complete = {}
-        self.turn_start_time = 0.0
+        self.turn_end_time = 0.0
         self.turn_time_left = 0
         self.reset_turn()
 
@@ -29,7 +30,7 @@ class GameEngine:
 
     def reset_turn(self):
         print("Resetting")
-        self.turn_start_time = time.time()
+        self.turn_end_time = time.time() + TURN_MAX_TIME
         self.turn_time_left = TURN_MAX_TIME
         self.complete = {"p1": False, "p2": False}
 
@@ -67,7 +68,7 @@ class GameEngine:
         return self.complete["p1"] and self.complete["p2"]
 
     def is_turn_over(self):
-        self.turn_time_left = max(time.time() - self.turn_start_time, 0)
+        self.turn_time_left = max(self.turn_end_time - time.time(), 0)
         print(self.turn_time_left)
         return self.turn_time_left <= 0
 
