@@ -36,7 +36,7 @@ int sequenceNumber = 0;
 //timer values for time out functionality of protocol
 bool isTimerStarted  = true; //In reality the default value will be false and will be updated by an interrupt, when the gun trigger is pressed
 bool canSendData = true; // state will be changed by an interrrupt
-long timeoutValue = 1000;
+long timeoutValue = 100;
 long transmissionStartTime = 0;
 
 typedef struct PacketStructure {
@@ -93,7 +93,7 @@ class GunPacketData{
       packet.payload_13 = (uint8_t) 0;
       packet.payload_14 = (uint8_t) 0;
       packet.payload_15 = (uint8_t) 0;
-      packet.payload_16 = (uint8_t) 1;
+      packet.payload_16 = (uint8_t) 67;
 
       //calcualting crc8 value 
       crc.add(packet.beetleId);
@@ -126,97 +126,77 @@ class GunPacketData{
 
       void transmitPacket() {
         Serial.write((uint8_t*)&packet, sizeof(packet));
+//        Serial.write(0x01);
       }
 };
 
 
-class VestDataPacket{
-  private:
-    int address;
-    int command;
-
-    public:
-//      void 
- };
-
-class ImuDataPacket{
-  private: 
-    float gx;
-    float gy;
-    float gz;
-    float ax;
-    float ay;
-    float az;
-    
-  public:
-    void getImuData();
-//    ImuDataPacket() {
-//      this.getImuData();
-//      this.Packet('I')
-//    }
-};
 
 
 class ReysProtocol {
   private:
-  bool isHandshake;
+  bool handshakeStart;
+  bool handshakeEnd;
   GunPacketData *packet;
 
   public:
 
   ReysProtocol() {
-  isHandshake = false;
-  packet = new GunPacketData();
-//  vestDataPacket = new  VestDataPacket();
-//  imuDataPacket = new imuDataPacket();
+    handshakeStart = false;
+    handshakeEnd = false;
+    packet = new GunPacketData();
   }
 
-  void clearBuffer() { 
-  }
   
   void start() {
-    uint8_t relayNodePacket = Serial.read();
-      if(isHandshake) {
-        if( (millis() - transmissionStartTime > timeoutValue) && canSendData && isTimerStarted) {
-              packet->setGunData();
-              packet->transmitPacket();
-              canSendData = false;
-              transmissionStartTime = millis();
-          } 
-          else if (relayNodePacket == ACK) {
-              canSendData = true;
-              isTimerStarted = false; //start timer value will be set to true using an interrupt
-              relayNodePacket = (uint8_t) 0;
-          } 
-          else if (relayNodePacket == NACK) {
-            //State variables modified to allow transmission of the corrupted packet again
-            canSendData = true;
-            isTimerStarted = true;
-            transmissionStartTime = 0;
-            relayNodePacket = (uint8_t) 0;
-          }
-      }  
-
-      else {
-        if(relayNodePacket == SYN)
-          Serial.write(ACK);
-
-        if(relayNodePacket == ACK)
-          isHandshake = true;
-      }  
+    if (Serial.available()) {
+      uint8_t receivedData = Serial.read();
+      switch(receivedData) {
+        case SYN: handshakeStart = true;
+                  handshakeEnd = false;
+                  Serial.write(ACK);
+                  break;
+  
+        case ACK:   handshakeStart = false;
+                    handshakeEnd = true;
+      }
+    }
+  
+    if (handshakeEnd) {
+  //     Serial.print(ACK);
+      packet->setGunData();
+      packet->transmitPacket();
+    }
   }
-
 };
 
 
 ReysProtocol* protocol;
-
-void setup(void) {
+//bool handshakeStart = false;
+//bool handshakeEnd = false;
+void setup() {
   Serial.begin(115200);
   protocol = new ReysProtocol();
 }
 
-void loop(void) {
-    protocol->start();
-//    delay(1000);
+void loop() {
+
+  protocol->start();
+
+//  if (Serial.available()) {
+//    uint8_t receivedData = Serial.read();
+//    switch(receivedData) {
+//      case SYN: handshakeStart = true;
+//                handshakeEnd = false;
+//                Serial.write(ACK);
+//                break;
+//
+//      case ACK:   handshakeStart = false;
+//                  handshakeEnd = true;
+//    }
+//  }
+//
+//  if (handshakeEnd) {
+//     Serial.print(2.98);
+//  }
 }
