@@ -45,6 +45,7 @@ void setup() {
   IrReceiver.begin(IR_RCV_PIN); //Start receiving
 }
 
+
 void deadTune(){
   for (int thisNote = 0; thisNote < 8; thisNote++) {
     int noteDuration = 1000 / noteDurations[thisNote];
@@ -52,6 +53,7 @@ void deadTune(){
     int pauseBetweenNotes = noteDuration * 1.30;
     delay(pauseBetweenNotes);
     noTone(8);
+
   }
 }
 void loop() {
@@ -64,7 +66,7 @@ void loop() {
     
     if (IrReceiver.decodedIRData.command == 0x02) {   //if hit by player 1's shot
       isShot = true;
-           
+      
       shotID = IrReceiver.decodedIRData.command;  //shotID of the player that hit you
       Serial.println("Received signal");  //debug
        
@@ -90,7 +92,16 @@ void loop() {
         }
 
       }       
+
     }
+
+    if (health == 0){
+      display.setSegments(DEAD);
+      tune();
+      health = 0;
+
+    }
+    
     IrReceiver.begin(IR_RCV_PIN); //continue receiving IR signals
     // IrReceiver.resume();
   }
