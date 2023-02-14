@@ -1,10 +1,11 @@
 from bluepy.btle import Peripheral, DefaultDelegate, BTLEDisconnectError, AssignedNumbers
 from concurrent.futures import ThreadPoolExecutor
+from crccheck.crc import Crc8
 from queue import Queue
 import threading 
 import logging
 import time 
-
+import struct
 
 
 #Respond Message Buffer size
@@ -25,10 +26,11 @@ TEST_MPU = 8
 #Constants for packet types 
 SYN = 'S' #Packet type for handshake. 
 FIN = 'F' #Packet type for closing connection.
+RST = 'R' #For 
 ACK = 'A' #Packet type for acknowledgment. 
-IMD = 'I' #Packet type for IMU data.
-GAM = 'B' #Packet type for Gun-Ammo. Identified by B which means bullet.
-GSH = 'H' #Packet type for Gun-Shot. Identified by H which means hit.
+IMD = (73,) #The ASCII code associated with I is 73
+GUN = (71,) #The ASCII code associated with G is 71
+VEST = (86,) #The ASCII code associated with V is 86
 
 #Services and Characteristics for the GATT layer of the protocol stack which is important for data communication between 
 #the central device and the respective peripherals, i.e the beetles.
@@ -55,6 +57,7 @@ class BufferManager:
     synchronizationBuffer = [False] * RESPONSE_BUFFER_SIZE #Used for synchronization 
     acknowledgementBuffer = [False] * RESPONSE_BUFFER_SIZE #Used for data transfer
     negativeAcknowledgementBuffer = [False] * RESPONSE_BUFFER_SIZE #Used for Data transfer
+    flushingAcknowledgementBuffer = [True] * RESPONSE_BUFFER_SIZE #Used for reseting bluno after wireless disconnection
     commonDataBuffer = Queue(DATA_BUFFER_SIZE)
     
     @classmethod
@@ -69,6 +72,10 @@ class BufferManager:
     def flip_nack_status(cls, beetle_id):
        cls.negativeAcknowledgementBuffer[beetle_id] = not cls.negativeAcknowledgementBuffer[beetle_id]
     
+    @classmethod
+    def flip_flush_status(cls, beetle_id):
+        cls.flushingAcknowledgementBuffer[beetle_id] = not  cls.flushingAcknowledgementBuffer[beetle_id] 
+
     @classmethod
     def set_data_buffer(cls, beetle_id, data):
         logging.info(f'common-data-buffer being set by beetle-{beetle_id}')
@@ -88,7 +95,11 @@ class BufferManager:
     @classmethod
     def get_nack_status(cls, beetle_id):
         return cls.negativeAcknowledgementBuffer[beetle_id]
-    
+   
+    @classmethod 
+    def get_flush_status(cls, beetle_id):
+        return cls.flushingAcknowledgementBuffer[beetle_id]
+
     @classmethod
     def get_data_buffer(cls):
         return cls.commonDataBuffer
@@ -96,15 +107,24 @@ class BufferManager:
 
 
 class BluetoothInterfaceHandler(DefaultDelegate):
-    def __init__(self, beetleId):
+    def __init__(self, beetleId, wasWirelessDisconnected):
         DefaultDelegate.__init__(self)
         self.beetleId = beetleId
         self.receivingBuffer = b'' 
-    
+        self.wasWirelessDisconnected = wasWirelessDisconnected
+
+    def checkCRC(self, packetData):
+        return Crc8.calc(packetData[0:18])
+
     def handleNotification(self, cHandle, data):
         self.receivingBuffer += data
         print(self.receivingBuffer)
-        logging.info(f'inside handle norifications function of beetle: {self.beetleId}')
+        logging.info(f'inside handleNorifications function of beetle: {self.beetleId}')
+        
+        if self.wasWirelessDisconnected:
+            self.receivingBuffer = b''
+            self.wasWirelessDisconnected = False
+
         if len(self.receivingBuffer) == 1 and self.receivingBuffer.decode(encoding='ascii') == 'A':
             #Steps to deal with acknowledgement sent from the arduino 
             print(f'The Transmitted information is as follows:\n')
@@ -115,11 +135,30 @@ class BluetoothInterfaceHandler(DefaultDelegate):
             #Flip flag bit associated with the beetleId to the set state so as to 
             #indicate that the synchronize packet has been acknowledged.
             BufferManager.flip_sync_status(self.beetleId)
+            self.receivingBuffer = b''
 
-        elif len(self.receivingBuffer) <= 20:
-            print(f'Data received from {self.beetleId} successfully. The data is as follows: \n')
-            print(self.receivingBuffer.decode(encoding='ascii'))
-            print(self.recevingBuffer)
+        elif len(self.receivingBuffer) >= 20:
+            packetData = bytearray(self.receivingBuffer[:20])
+            receivingBuffer = self.receivingBuffer[20:]
+            
+            sequenceNumber = struct.unpack('b', packetData[1:2])
+            packetType = struct.unpack('b', packetData[2:3])
+            actualCrcValue = struct.unpack('b', packetData[19:20])
+            calculatedCrcValue = self.checkCRC(packetData)
+            
+            #if packetType == GUN:
+            print(f'RECEIVED GUN DATA FROM BEETLE- {self.beetleId}')
+            gunData = struct.unpack('b', packetData[18:19])
+            print(f'VALUE RETURNED BY GUN DATA = {gunData}')
+            print(f'Sequence number of packet = {sequenceNumber}')
+            print(f'The CRC VALUE OF THE PACKET = {calculatedCrcValue}')
+            print(f'Packet is not corrupted = {actualCrcValue == calculatedCrcValue}')
+
+            #print(f'Sequence number of received packet = {sequenceNumber}')
+            #print(f'Packet type of received packet = {packetType}')
+            #print(f'Data received from {self.beetleId} successfully. The data is as follows: \n')
+            #print(self.receivingBuffer.decode(encoding='ascii'))
+            #print(self.recevingBuffer)
         else: #Dealing with the case where data spans across multiple packets
             print('Packet is fragmented')
 
@@ -131,7 +170,8 @@ class BlunoDevice:
         self.beetleId = beetleId
         self.macAddress = macAddress
         self.peripheral = None
-        self.blutoothInterfaceHandler = None 
+        self.blutoothInterfaceHandler = None
+        self.wasWirelessDisconnected = False
         self.isARQ = isARQ ### No need to keep track of nagative-acknowledgement-buffer if this is set to false 
 
     def establish_connection(self, text):
@@ -140,8 +180,12 @@ class BlunoDevice:
             try: 
                 self.peripheral = Peripheral(self.macAddress)
                 #Peripheral(self.macAddress) 
-                self.bluetoothInterfaceHandler = BluetoothInterfaceHandler(self.beetleId)
+                self.bluetoothInterfaceHandler = BluetoothInterfaceHandler(self.beetleId, self.wasWirelessDisconnected)
                 self.peripheral.withDelegate(self.bluetoothInterfaceHandler)
+                
+                if self.wasWirelessDisconnected:
+                    self.wasWirelessDisconnected = False
+
                 #logging.info(self.peripheral.getCharacteristics())
                 logging.info(f'Connection successfully established between the beetle-{self.beetleId} and relay node.')
                 #self.peripheral.waitForNotifications(1)
@@ -153,70 +197,85 @@ class BlunoDevice:
     
     def transmit_data(self, data):
         try:
-            logging.info('before intialization of transmit_data function')
+            #logging.info('before intialization of transmit_data function')
             #serialService = self.peripheral.getServiceByUUID(GATT_SERVICE_UUID)
             #serialServiceChararacteristics = serialService.getCharacteristics(GATT_SERVICE_UUID)
             
-            logging.info('before for loop of transmit_data function')
+            #logging.info('before for loop of transmit_data function')
             for characteristic in self.peripheral.getCharacteristics():
-                logging.info('Inside for loop of transmit_data function')
+                #logging.info('Inside for loop of transmit_data function')
                 #if characteristic == GATT_WRITE_CHARACTERISTIC_UUID: 
                 characteristic.write(bytes(data,'ascii'), withResponse=False)
-                logging.info(f'data transmitted over to beetle {self.beetleId}')
+                #logging.info(f'data transmitted over to beetle {self.beetleId}')
 
         except Exception as e:
             logging.info(f'Something went wrong during the transmission process: \n {e}')
-
+    
     def handshake_mechanism(self, isHandshakeCompleted):
+        counter = 0
         while not isHandshakeCompleted:
-            logging.info(f'Still in handshaking mechanism for beetle-{self.beetleId}')
-            if not BufferManager.get_sync_status(self.beetleId):
+            counter += 1
+            if counter % 3 == 0:
+                self.peripheral.disconnect()
+                self.establish_connection(self.beetleId)
+                counter = 0
+            
+            logging.info(f'Still in handshaking mechanism for beetle-{self.beetleId} and counter = {counter}')
+            if not BufferManager.get_sync_status(self.beetleId) and not BufferManager.get_ack_status(self.beetleId): 
                 #Step-1: Transmit synchronization packet from relay node 
                 self.transmit_data(SYN)
                 #Step-2: Wait for ACK from peripheral to make sure it received the SYN packet
-                self.peripheral.waitForNotifications(1.0) 
-                logging.info('synchronization flag set in handshake mechanism')
-                self.transmit_data(ACK)
+                self.peripheral.waitForNotifications(0.1) 
+                #logging.info('synchronization flag set in handshake mechanism')
+                
+                if BufferManager.get_sync_status(self.beetleId):
+                    self.transmit_data(ACK)
+                    BufferManager.flip_ack_status(self.beetleId)
             else:    
-                #Step-3: Flip synchronization flag for the associated beetle to a intital state
-                BufferManager.flip_sync_status(self.beetleId)
+                #Step-3: Flip synchronization flag and acknowledgement flag  for the associated beetle to a intital state
+                #BufferManager.flip_sync_status(self.beetleId)
+                BufferManager.flip_ack_status(self.beetleId)
                 #Step-4: set handshake 
                 isHandshakeCompleted = True 
+                logging.info(f'Handshake established with beetle-{self.beetleId}')
+                #logging.info('synchronization flag associated with beetle-{self.beetleId} is cleared')
         
-        logging.info(f'Handshake established with beetle-{self.beetleId}')
-        logging.info('synchronization flag associated with beetle-{self.beetleId} is cleared')
         return isHandshakeCompleted
     
     def reys_transmission_protocol(self,text):
         isHandshakeCompleted = False
-        try:
-            while True: 
+        while True:
+            try:
+                logging.info(f'HANDSHAKE-STATUS = {isHandshakeCompleted}') 
                 if not isHandshakeCompleted:
                     #1. Connect/Reconnect to bettle 
                     self.establish_connection(self.beetleId)
                     #2. perform handshake mechanism 
                     isHandshakeCompleted = self.handshake_mechanism(isHandshakeCompleted)
-                    #3. Wait for ACK from bluno
-                    #4. If ACK is received from bluno, send an ACK from your end as well 
                 else:
                     #regular data transfer
-                    self.transmit_data('D')
                     logging.info(f'Code involed for data communication between relay node and beetle {self.beetleId} \r')
-                    self.peripheral.waitForNotifications(0.1)
+                    self.peripheral.waitForNotifications(1)
                     
-        except KeyboardInterrupt:
-            self.peripheral.disconnect()
-            print(f'Beetle-{self.beetleId} been disconnected due to a keyboard interrupt on the relay node')
+            except KeyboardInterrupt:
+                self.peripheral.disconnect()
+                print(f'Beetle-{self.beetleId} been disconnected due to a keyboard interrupt on the relay node')
         
-        except BTLEDisconnectError:
-            print(f'Beetle-{self.beetleId} been disconnected due to a significantly large distance from the relay node')
-            isHandshakeCompleted = False
-            pass
-
-        except Exception as e:
-            print(f'Something went wrong in protocol with beetle{self.beetleId}')
-            print(f'Refer to the following exception below:\n {e}')
-
+            except BTLEDisconnectError:
+                print(f'Beetle-{self.beetleId} been disconnected due to a significantly large distance from the relay node')
+                print(f'Attempting Reconnection')
+                #self.peripheral.disconnect()
+                isHandshakeCompleted = False
+                wasWirelessDisconnected = True 
+                BufferManager.flip_sync_status(self.beetleId)
+                #BufferManager.flip_ack_status(self.beetleId)
+                pass
+            #except Exception as e:
+                #print(f'Something went wrong in protocol with beetle{self.beetleId}')
+                #print(f'Refer to the following exception below:\n {e}')
+                #self.peripheral.connect()
+                #isHandshakeCompleted = False
+                #pass
     def dummy(self, text):
         print(f'This message is from {text}')
 
@@ -245,7 +304,7 @@ if __name__ == '__main__':
     beetle8 = BlunoDevice(TEST_MPU, MAC_ADDRESSES[TEST_MPU], True)
     
     logging.info('Before Instantiation of threads')
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=1) as executor:
         #executor.submit(beetle6.reys_transmission_protocol, ('beetle-6'))
         executor.submit(beetle7.reys_transmission_protocol, ('beetle-7'))
         #executor.submit(beetle8.reys_transmission_protocol, ('beetle-8'))
