@@ -118,8 +118,8 @@ class BluetoothInterfaceHandler(DefaultDelegate):
 
     def handleNotification(self, cHandle, data):
         self.receivingBuffer += data
-        print(self.receivingBuffer)
-        logging.info(f'inside handleNorifications function of beetle: {self.beetleId}')
+        #print(self.receivingBuffer)
+        #logging.info(f'inside handleNorifications function of beetle: {self.beetleId}')
         
         if self.wasWirelessDisconnected:
             self.receivingBuffer = b''
@@ -127,11 +127,11 @@ class BluetoothInterfaceHandler(DefaultDelegate):
 
         if len(self.receivingBuffer) == 1 and self.receivingBuffer.decode(encoding='ascii') == 'A':
             #Steps to deal with acknowledgement sent from the arduino 
-            print(f'The Transmitted information is as follows:\n')
-            print(len(self.receivingBuffer) == 1)
-            print(self.receivingBuffer.decode(encoding='ascii'))
-            print(self.receivingBuffer)
-            logging.info(f'ACK received from beetle-{self.beetleId} successfully')
+            #print(f'The Transmitted information is as follows:\n')
+            #print(len(self.receivingBuffer) == 1)
+            #print(self.receivingBuffer.decode(encoding='ascii'))
+            #print(self.receivingBuffer)
+            #logging.info(f'ACK received from beetle-{self.beetleId} successfully')
             #Flip flag bit associated with the beetleId to the set state so as to 
             #indicate that the synchronize packet has been acknowledged.
             BufferManager.flip_sync_status(self.beetleId)
@@ -149,10 +149,10 @@ class BluetoothInterfaceHandler(DefaultDelegate):
             #if packetType == GUN:
             print(f'RECEIVED GUN DATA FROM BEETLE- {self.beetleId}')
             gunData = struct.unpack('b', packetData[18:19])
-            print(f'VALUE RETURNED BY GUN DATA = {gunData}')
-            print(f'Sequence number of packet = {sequenceNumber}')
-            print(f'The CRC VALUE OF THE PACKET = {calculatedCrcValue}')
-            print(f'Packet is not corrupted = {actualCrcValue == calculatedCrcValue}')
+            #print(f'VALUE RETURNED BY GUN DATA = {gunData}')
+            #print(f'Sequence number of packet = {sequenceNumber}')
+            #print(f'The CRC VALUE OF THE PACKET = {calculatedCrcValue}')
+            #print(f'Packet is not corrupted = {actualCrcValue == calculatedCrcValue}')
 
             #print(f'Sequence number of received packet = {sequenceNumber}')
             #print(f'Packet type of received packet = {packetType}')
@@ -189,7 +189,7 @@ class BlunoDevice:
                 #logging.info(self.peripheral.getCharacteristics())
                 logging.info(f'Connection successfully established between the beetle-{self.beetleId} and relay node.')
                 #self.peripheral.waitForNotifications(1)
-                logging.info('finished waiting for notifications')
+                #logging.info('finished waiting for notifications')
                 break
             except Exception as e:
                 logging.info(f'Could not connect to bluno device: {self.beetleId} due to the following exception.\n {e}')
@@ -215,7 +215,7 @@ class BlunoDevice:
         counter = 0
         while not isHandshakeCompleted:
             counter += 1
-            if counter % 3 == 0:
+            if counter % 5 == 0:
                 self.peripheral.disconnect()
                 self.establish_connection(self.beetleId)
                 counter = 0
@@ -246,7 +246,7 @@ class BlunoDevice:
         isHandshakeCompleted = False
         while True:
             try:
-                logging.info(f'HANDSHAKE-STATUS = {isHandshakeCompleted}') 
+                #logging.info(f'HANDSHAKE-STATUS = {isHandshakeCompleted}') 
                 if not isHandshakeCompleted:
                     #1. Connect/Reconnect to bettle 
                     self.establish_connection(self.beetleId)
@@ -254,7 +254,7 @@ class BlunoDevice:
                     isHandshakeCompleted = self.handshake_mechanism(isHandshakeCompleted)
                 else:
                     #regular data transfer
-                    logging.info(f'Code involed for data communication between relay node and beetle {self.beetleId} \r')
+                    #logging.info(f'Code involed for data communication between relay node and beetle {self.beetleId} \r')
                     self.peripheral.waitForNotifications(1)
                     
             except KeyboardInterrupt:
@@ -304,7 +304,7 @@ if __name__ == '__main__':
     beetle8 = BlunoDevice(TEST_MPU, MAC_ADDRESSES[TEST_MPU], True)
     
     logging.info('Before Instantiation of threads')
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        #executor.submit(beetle6.reys_transmission_protocol, ('beetle-6'))
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        executor.submit(beetle6.reys_transmission_protocol, ('beetle-6'))
         executor.submit(beetle7.reys_transmission_protocol, ('beetle-7'))
-        #executor.submit(beetle8.reys_transmission_protocol, ('beetle-8'))
+        executor.submit(beetle8.reys_transmission_protocol, ('beetle-8'))
