@@ -10,21 +10,11 @@ const int buzzerPin = 5;    //buzzer at pin D5
 int buttonState = 0;
 
 const uint16_t PLAYER_1_ADDRESS = 0x0102;
-const uint16_t PLAYER_2_ADDRESS = 0x0103;
-const uint8_t command = 0x01;
+const uint16_t PLAYER_2_ADDRESS = 0x0105;
+const uint8_t command = 0x01; //1 for player 1
 uint8_t repeats = 1;
 uint8_t shotCounter = 0;
 
-int melody[] = {
-
-  NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4
-};
-
-// note durations: 4 = quarter note, 8 = eighth note, etc.:
-int noteDurations[] = {
-
-  4, 8, 8, 4, 4, 4, 4, 4
-};
 
 void setup() {
   // put your setup code here, to run once:
@@ -35,15 +25,12 @@ void setup() {
   IrSender.begin(IR_SEND_PIN);  //start sending pin
 }
 
-void tune() {
-  for (int thisNote = 0; thisNote < 8; thisNote++) {
-    int noteDuration = 1000 / noteDurations[thisNote];
-    tone(buzzerPin, melody[thisNote], noteDuration);
-    int pauseBetweenNotes = noteDuration * 1.30;
-    delay(pauseBetweenNotes);
-    noTone(buzzerPin);
-  }
+void outOfAmmoTune() {
+  tone(buzzerPin,NOTE_D1,100);
+  delay(100);
+  tone(buzzerPin,NOTE_E1,100);
 }
+
 void loop() {
   // put your main code here, to run repeatedly:
   buttonState = digitalRead(buttonPin);
@@ -110,11 +97,11 @@ void loop() {
 
       default:
       Serial.println("out of ammo");
-      tone(buzzerPin,NOTE_C7, 100);
+      outOfAmmoTune();
       delay(500);
       break;
   }
   }
     
-Serial.println(shotCounter);
+// Serial.println(shotCounter);
 }
