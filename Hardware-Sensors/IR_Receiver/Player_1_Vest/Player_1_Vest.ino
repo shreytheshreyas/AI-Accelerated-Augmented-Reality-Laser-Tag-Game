@@ -2,7 +2,6 @@
 #include <TM1637Display.h>
 #include "pitches.h"
 
-
 #define DECODE_NEC
 #define CLK 4
 #define DIO 2
@@ -12,9 +11,6 @@
 // Create a display object of type TM1637Display
 TM1637Display display = TM1637Display(CLK, DIO);
 
-
-// const int IR_RCV_PIN = 3; // IR Receiver at pin D3
-// const int buzzerPin = 5; // Buzzer Pin at D5
 const uint16_t PLAYER_1_ADDRESS = 0x0102; //Address for Player 1's Shot
 const uint16_t PLAYER_2_ADDRESS = 0x0105; //Address for Player 2's Shot
 bool isShot = false;  //To indicate if hit is registered
@@ -49,27 +45,13 @@ void setup() {
   IrReceiver.begin(IR_RCV_PIN); //Start receiving
 }
 
-void tune(){
+
+void deadTune(){
   for (int thisNote = 0; thisNote < 8; thisNote++) {
-
-    // to calculate the note duration, take one second divided by the note type.
-
-    //e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
-
     int noteDuration = 1000 / noteDurations[thisNote];
-
-    tone(8, melody[thisNote], noteDuration);
-
-    // to distinguish the notes, set a minimum time between them.
-
-    // the note's duration + 30% seems to work well:
-
+    tone(BUZZER_PIN, melody[thisNote], noteDuration);
     int pauseBetweenNotes = noteDuration * 1.30;
-
     delay(pauseBetweenNotes);
-
-    // stop the tone playing:
-
     noTone(8);
 
   }
@@ -84,20 +66,33 @@ void loop() {
     
     if (IrReceiver.decodedIRData.command == 0x02) {   //if hit by player 1's shot
       isShot = true;
-      shotCounter += 1;
-      health = 100 - shotCounter*10;
       
       shotID = IrReceiver.decodedIRData.command;  //shotID of the player that hit you
       Serial.println("Received signal");  //debug
-      
-    }
-    
-    if (isShot == true) { //trigger sound if shot is registered
-    tone(BUZZER_PIN,3000,100);
-    isShot = false;
-    display.showNumberDec(health);
-    delay(100);
-    // Serial.println("test");
+       
+      if (isShot == true && health == 0) {
+        display.setSegments(DEAD);
+        deadTune();
+        health = 0;
+      } 
+      else if (isShot == true){
+        shotCounter += 1;
+        health = 100 - shotCounter*10;
+        tone(BUZZER_PIN,5000,100);
+        isShot = false;
+
+        if (health == 0) {
+          display.setSegments(DEAD);
+          deadTune();
+          delay(100);
+        }
+        else {
+          display.showNumberDec(health);
+          delay(100);
+        }
+
+      }       
+
     }
 
     if (health == 0){
