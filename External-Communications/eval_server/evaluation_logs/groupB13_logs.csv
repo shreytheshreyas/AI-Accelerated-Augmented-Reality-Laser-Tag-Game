@@ -1,0 +1,2 @@
+timestamp,id,p1_action,gt_p1_action,p2_action,gt_p2_action,response_time,is_p1_action_correct,is_p2_action_correct
+1675845171.208276,4024,shield,reload,none,none,1.8607404232025146,False,True
