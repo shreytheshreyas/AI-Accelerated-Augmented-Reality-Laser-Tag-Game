@@ -19,7 +19,7 @@ class MQTTClient:
 
             with self.opp_in_frames.get_lock():
                 self.opp_in_frames[index] = int(msg_json["inFrame"])
-                print(self.opp_in_frames[:])
+                print(f'OppInFrame updated - p1: {bool(self.opp_in_frames[0]} p2: {bool(self.opp_in_frames[1]}')
 
         self.vis_queue = vis_queue
         self.opp_in_frames = opp_in_frames
@@ -48,5 +48,50 @@ class MQTTClient:
 
 
 if __name__ == "__main__":
-    mqtt_client = MQTTClient()
-    mqtt_client.run()
+    vis_data = [
+        {
+            "p1": {
+                "hp": 100,
+                "action": "none",
+                "bullets": 6,
+                "grenades": 2,
+                "shield_time": 0,
+                "shield_health": 0,
+                "num_deaths": 0,
+                "num_shield": 3,
+            },
+            "p2": {
+                "hp": 100,
+                "action": "none",
+                "bullets": 6,
+                "grenades": 2,
+                "shield_time": 0,
+                "shield_health": 0,
+                "num_deaths": 0,
+                "num_shield": 3,
+            },
+        }
+    ] * 4
+
+    vis_queue = mp.Queue()
+    opp_in_frames = mp.Array("i", [0] * 2)
+
+    mqtt_client = MQTTClient(vis_queue, opp_in_frames)
+    process = mp.Process(target=mqtt_client.run)
+    vis_process = mp.Process(
+        target=put_queue,
+        args=(
+            vis_queue,
+            vis_data,
+        ),
+    )
+
+    try:
+        mqtt_process.start()
+        vis_process.start()
+        mqtt_process.join()
+        vis_process.join()
+
+    finally:
+        mqtt_process.terminate()
+        vis_process.terminate()

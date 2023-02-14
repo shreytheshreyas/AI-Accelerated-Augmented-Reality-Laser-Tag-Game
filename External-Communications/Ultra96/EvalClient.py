@@ -1,27 +1,49 @@
 import base64
 import json
+import multiprocessing as mp
 import socket
 
 from Crypto import Random
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 
+from Test import get_queue, put_queue
+
 
 class EvalClient:
-    def __init__(self, req_queue, resp_queue):
+    def __init__(self, server_name, server_port, req_queue, resp_queue):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.secret_key = "PLSPLSPLSPLSWORK"
         self.iv = Random.new().read(AES.block_size)
         self.req_queue = req_queue
         self.resp_queue = resp_queue
 
-    def connect(self, serverName, serverPort):
-        self.socket.connect((serverName, serverPort))
+        self.server_name = server_name
+        self.server_port = server_port
+
+    def connect(self):
+        self.socket.connect((self.server_name, self.server_port))
+        print(f"Connected to Eval Server at {self.server_name}:{self.server_port}")
+
+    def send_ciphertext(self, plaintext):
+        success = True
+
+        cipher = AES.new(self.secret_key.encode("utf-8"), AES.MODE_CBC, self.iv)
+        padded_pt = pad(plaintext.encode("utf-8"), AES.block_size)
+        ciphertext = base64.b64encode(self.iv + cipher.encrypt(padded_pt))
+
+        m = str(len(ciphertext)) + "_"
+        try:
+            self.socket.sendall(m.encode("utf-8"))
+            self.socket.sendall(ciphertext)
+        except OSError:
+            print("Connection terminated")
+            success = False
+        return success
 
     def recv_game_state(self):
         game_state_received = None
         try:
-            # recv length followed by '_' followed by cypher
             data = b""
             while not data.endswith(b"_"):
                 _d = self.socket.recv(1)
@@ -47,7 +69,7 @@ class EvalClient:
                 print("no more data from the client")
                 return None
 
-            msg = data.decode("utf-8")  # Decode raw bytes to UTF-8
+            msg = data.decode("utf-8")
             game_state_received = msg
 
         except ConnectionResetError:
@@ -56,29 +78,8 @@ class EvalClient:
 
         return game_state_received
 
-    def send_ciphertext(self, plaintext):
-        success = True
-
-        cipher = AES.new(self.secret_key.encode("utf-8"), AES.MODE_CBC, self.iv)
-        padded_pt = pad(plaintext.encode("utf-8"), AES.block_size)
-        ciphertext = base64.b64encode(self.iv + cipher.encrypt(padded_pt))
-
-        # ice_print_debug(f"Sending message to client: {plaintext} (Unencrypted)")
-        # send len followed by '_' followed by cypher
-        m = str(len(ciphertext)) + "_"
-        try:
-            self.socket.sendall(m.encode("utf-8"))
-            self.socket.sendall(ciphertext)
-        except OSError:
-            print("Connection terminated")
-            success = False
-        return success
-
     def run(self):
         while True:
-            # user_input = input("enter to continue/ q to quit: ")
-            # if user_input == "q":
-            #     break
             eval_data = self.req_queue.get()
             eval_json = json.dumps(eval_data)
             self.send_ciphertext(eval_json)
@@ -87,7 +88,6 @@ class EvalClient:
             if not recv_json:
                 break
 
-            print("From server:", recv_json)
             recv_data = json.loads(recv_json)
             self.resp_queue.put(recv_data)
 
@@ -95,6 +95,57 @@ class EvalClient:
 
 
 if __name__ == "__main__":
-    client = EvalClient()
-    client.connect("127.0.0.1", 2105)
-    client.run()
+    eval_data = [
+        {
+            "p1": {
+                "hp": 100,
+                "action": "none",
+                "bullets": 6,
+                "grenades": 2,
+                "shield_time": 0,
+                "shield_health": 0,
+                "num_deaths": 0,
+                "num_shield": 3,
+            },
+            "p2": {
+                "hp": 100,
+                "action": "none",
+                "bullets": 6,
+                "grenades": 2,
+                "shield_time": 0,
+                "shield_health": 0,
+                "num_deaths": 0,
+                "num_shield": 3,
+            },
+        }
+    ] * 4
+
+    req_queue = mp.Queue()
+    resp_queue = mp.Queue()
+
+    client = EvalClient("127.0.0.1", 2108, req_queue, resp_queue)
+    client.connect()
+
+    eval_process = mp.Process(target=client.run)
+    req_process = mp.Process(
+        target=put_queue,
+        args=(
+            req_queue,
+            eval_data,
+        ),
+    )
+    resp_process = mp.Process(target=get_queue, args=(resp_queue,))
+
+    try:
+        eval_process.start()
+        req_process.start()
+        resp_process.start()
+
+        eval_process.join()
+        req_process.join()
+        resp_process.join()
+    except KeyboardInterrupt:
+        print("\nClient Stopped")
+        eval_process.terminate()
+        req_process.terminate()
+        resp_process.terminate()

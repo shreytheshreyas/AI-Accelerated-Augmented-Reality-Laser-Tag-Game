@@ -4,15 +4,22 @@ import sys
 from sshtunnel import open_tunnel
 
 
+PROMPT = """
+Choose one of the followingg beetle actions:
+  1. Gun
+  2. Vest
+  3. Glove
+  4. Quit
+Your choice: 
+"""
+
+
 # Communicates with eval_server
 class Client:
-    def __init__(self, server_name, server_port, sensor):
+    def __init__(self, server_name, server_port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_name = server_name
         self.server_port = server_port
-
-        self.sensor = sensor
-        self.actions = {"gun": "shoot", "vest": "hit", "glove": "action"}
 
     def connect(self):
         soc_tunnel = open_tunnel(
@@ -27,7 +34,8 @@ class Client:
         ultra96_tunnel = open_tunnel(
             ssh_address_or_host=("127.0.0.1", soc_tunnel.local_bind_port),
             remote_bind_address=("127.0.0.1", self.server_port),
-            ssh_password="xilinxB13capstone",
+            # ssh_password="xilinxB13capstone",
+            ssh_password="xilinx",
             ssh_username="xilinx",
             block_on_close=False,
         )
@@ -89,8 +97,23 @@ class Client:
         return success
 
     def run(self):
-        send_json = '{"player": "p1", "sensor": "' + self.sensor + '"}'
-        self.send_plaintext(send_json)
+        sensors = ["gun", "vest", "glove"]
+        actions = {"gun": "shoot", "vest": "hit", "glove": "glove_movement"}
+
+        sensor = ""
+
+        while not sensor:
+            user_input = input(PROMPT.strip())
+
+            if user_input not in "1234":
+                print("Input invalid, try again")
+                continue
+
+            sensor = sensors[int(user_input) - 1]
+            send_json = '{"player": "p1", "sensor": "' + sensor + '"}'
+
+            print("Sending", send_json)
+            self.send_plaintext(send_json)
 
         receivedMsg = self.recv_game_state()
         if not receivedMsg:
@@ -103,9 +126,9 @@ class Client:
             if user_input == "q":
                 break
             send_json = "shoot"
-            if self.sensor not in self.actions:
+            if sensor not in actions:
                 break
-            action = self.actions[self.sensor]
+            action = actions[sensor]
 
             print("Sending", action)
             self.send_plaintext(action)
@@ -120,9 +143,6 @@ class Client:
 
 
 if __name__ == "__main__":
-    sensor = "gun"
-    if len(sys.argv) == 2:
-        sensor = sys.argv[1]
-    client = Client("192.168.95.236", 8080, sensor)
+    client = Client("192.168.95.250", 8080)
     client.connect()
     client.run()

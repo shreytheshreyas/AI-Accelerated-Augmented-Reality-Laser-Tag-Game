@@ -3,6 +3,7 @@ import multiprocessing as mp
 import socket
 
 from HWAccel_Stub import HWAccel_Stub
+from Test import get_queue
 
 
 class RelayServer:
@@ -10,7 +11,6 @@ class RelayServer:
         self.host = host
         self.port = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._stop_event = mp.Event()
         self.end_queue = mp.Queue()
         self.connected = {
             "p1_gun": False,
@@ -76,7 +76,7 @@ class RelayServer:
         return success
 
     def handle_gun_conn(self, conn, end_queue, action_queue, player, component):
-        while not self._stop_event.is_set():
+        while True:
             msg = self.recv_msg(conn)
             if not msg:
                 break
@@ -91,7 +91,7 @@ class RelayServer:
         conn.close()
 
     def handle_vest_conn(self, conn, end_queue, action_queue, player, component):
-        while not self._stop_event.is_set():
+        while True:
             msg = self.recv_msg(conn)
             if not msg:
                 break
@@ -105,7 +105,7 @@ class RelayServer:
         conn.close()
 
     def handle_glove_conn(self, conn, end_queue, action_queue, player, component):
-        while not self._stop_event.is_set():
+        while True:
             msg = self.recv_msg(conn)
             if not msg:
                 break
@@ -146,7 +146,7 @@ class RelayServer:
         self.socket.listen(6)
         print(f"Listening on {self.host}:{self.port}...")
 
-        while not self._stop_event.is_set():
+        while True:
             while self.end_queue.qsize() > 0:
                 component_end = self.end_queue.get()
                 self.connected[component_end] = False
@@ -179,16 +179,18 @@ class RelayServer:
                 )
                 p.start()
 
-    def stop(self):
-        self._stop_event.set()
-
 
 if __name__ == "__main__":
-    pass
-    # queue = Queue()
-    # server = RelayServer("127.0.0.1", 8080, queue)
-    # try:
-    #     server.start()
-    # except KeyboardInterrupt:
-    #     server.stop()
-    #     print("\nServer Stopped")
+    action_queue = mp.Queue()
+
+    relay_server = RelayServer("127.0.0.1", 8080, action_queue)
+    relay_server_process = mp.Process(target=relay_server.run)
+
+    action_process = mp.Process(target=get_queue, args=(action_queue,))
+
+    try:
+        relay_server_process.start()
+        relay_server_process.join()
+    except KeyboardInterrupt:
+        print("\nServer Stopped")
+        relay_server_process.terminate()

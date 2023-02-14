@@ -13,7 +13,7 @@ Your choice:
 
 # Communicates with eval_server
 class Client:
-    def __init__(self, server_name, server_port, sensor):
+    def __init__(self, server_name, server_port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_name = server_name
         self.server_port = server_port
@@ -122,6 +122,6 @@ if __name__ == "__main__":
     sensor = "gun"
     if len(sys.argv) == 2:
         sensor = sys.argv[1]
-    client = Client("192.168.95.236", 8080, sensor)
+    client = Client("192.168.95.234", 8080)
     client.connect()
     client.run()
