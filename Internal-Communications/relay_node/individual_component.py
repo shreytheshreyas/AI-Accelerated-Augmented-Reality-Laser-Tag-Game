@@ -32,8 +32,12 @@ GSH = 'H' #Packet type for Gun-Shot. Identified by H which means hit.
 
 #Services and Characteristics for the GATT layer of the protocol stack which is important for data communication between 
 #the central device and the respective peripherals, i.e the beetles.
-GATT_SERVICE_UUID = "0000dfb0-0000-1000-8000-00805f9b34fb"
-GATT_WRITE_CHARACTERISTIC_UUID = "0000dfb1-0000-1000-8000-00805f9b34fb"
+#GATT_SERVICE_UUID = "0000dfb0-0000-1000-8000-00805f9b34fb"
+#GATT_WRITE_CHARACTERISTIC_UUID = "0000dfb1-0000-1000-8000-00805f9b34fb"
+
+GATT_SERVICE_UUID = "DFBO"
+GATT_WRITE_CHARACTERISTIC_UUID = "DFB1"
+
 
 MAC_ADDRESSES = {
         0: "D0:39:72:BF:CA:D4",
@@ -99,23 +103,25 @@ class BluetoothInterfaceHandler(DefaultDelegate):
     
     def handleNotification(self, cHandle, data):
         self.receivingBuffer += data
-        
-        #Steps to deal with acknowledgement sent from the arduino 
-        #print(f'The Transmitted information is as follows:\n')
-        #print(len(self.receivingBuffer) == 1)
-        #print(self.receivingBuffer.decode(encoding='ascii'))
-        #print(self.receivingBuffer)
-
+        print(self.receivingBuffer)
+        logging.info(f'inside handle norifications function of beetle: {self.beetleId}')
         if len(self.receivingBuffer) == 1 and self.receivingBuffer.decode(encoding='ascii') == 'A':
+            #Steps to deal with acknowledgement sent from the arduino 
+            print(f'The Transmitted information is as follows:\n')
+            print(len(self.receivingBuffer) == 1)
+            print(self.receivingBuffer.decode(encoding='ascii'))
+            print(self.receivingBuffer)
             logging.info(f'ACK received from beetle-{self.beetleId} successfully')
             #Flip flag bit associated with the beetleId to the set state so as to 
             #indicate that the synchronize packet has been acknowledged.
             BufferManager.flip_sync_status(self.beetleId)
 
         elif len(self.receivingBuffer) <= 20:
-                print(self.receivingbuffer)
+            print(f'Data received from {self.beetleId} successfully. The data is as follows: \n')
+            print(self.receivingBuffer.decode(encoding='ascii'))
+            print(self.recevingBuffer)
         else: #Dealing with the case where data spans across multiple packets
-            pass
+            print('Packet is fragmented')
 
 
 
@@ -135,7 +141,7 @@ class BlunoDevice:
                 self.peripheral = Peripheral(self.macAddress)
                 #Peripheral(self.macAddress) 
                 self.bluetoothInterfaceHandler = BluetoothInterfaceHandler(self.beetleId)
-                self.peripheral.setDelegate(self.bluetoothInterfaceHandler)
+                self.peripheral.withDelegate(self.bluetoothInterfaceHandler)
                 #logging.info(self.peripheral.getCharacteristics())
                 logging.info(f'Connection successfully established between the beetle-{self.beetleId} and relay node.')
                 #self.peripheral.waitForNotifications(1)
@@ -147,16 +153,16 @@ class BlunoDevice:
     
     def transmit_data(self, data):
         try:
-            logging.info('before for intialization of transmit_data function')
+            logging.info('before intialization of transmit_data function')
             #serialService = self.peripheral.getServiceByUUID(GATT_SERVICE_UUID)
-            #serialServiceChararacteristics = serialService.getCharacteristics(serialService)
+            #serialServiceChararacteristics = serialService.getCharacteristics(GATT_SERVICE_UUID)
             
             logging.info('before for loop of transmit_data function')
             for characteristic in self.peripheral.getCharacteristics():
                 logging.info('Inside for loop of transmit_data function')
-                #if characteristic == GATT_WRITE_CHARACTERISTIC_UUID 
-                characteristic.write(bytes(data,'utf-8'), withResponse=False)
-                logging.info(f'data transmitted over to beetle-{self.beetleId}')
+                #if characteristic == GATT_WRITE_CHARACTERISTIC_UUID: 
+                characteristic.write(bytes(data,'ascii'), withResponse=False)
+                logging.info(f'data transmitted over to beetle {self.beetleId}')
 
         except Exception as e:
             logging.info(f'Something went wrong during the transmission process: \n {e}')
@@ -170,6 +176,7 @@ class BlunoDevice:
                 #Step-2: Wait for ACK from peripheral to make sure it received the SYN packet
                 self.peripheral.waitForNotifications(1.0) 
                 logging.info('synchronization flag set in handshake mechanism')
+                self.transmit_data(ACK)
             else:    
                 #Step-3: Flip synchronization flag for the associated beetle to a intital state
                 BufferManager.flip_sync_status(self.beetleId)
@@ -192,10 +199,11 @@ class BlunoDevice:
                     #3. Wait for ACK from bluno
                     #4. If ACK is received from bluno, send an ACK from your end as well 
                 else:
-                    pass
                     #regular data transfer
-                    print('Code involed for data communication between relay node and beetle-{self.beetleId}')
-                    self.peripheral.waitForNotification(1.0)
+                    self.transmit_data('D')
+                    logging.info(f'Code involed for data communication between relay node and beetle {self.beetleId} \r')
+                    self.peripheral.waitForNotifications(0.1)
+                    
         except KeyboardInterrupt:
             self.peripheral.disconnect()
             print(f'Beetle-{self.beetleId} been disconnected due to a keyboard interrupt on the relay node')
@@ -238,6 +246,6 @@ if __name__ == '__main__':
     
     logging.info('Before Instantiation of threads')
     with ThreadPoolExecutor(max_workers=3) as executor:
-        executor.submit(beetle6.reys_transmission_protocol, ('beetle-6'))
+        #executor.submit(beetle6.reys_transmission_protocol, ('beetle-6'))
         executor.submit(beetle7.reys_transmission_protocol, ('beetle-7'))
-        executor.submit(beetle8.reys_transmission_protocol, ('beetle-8'))
+        #executor.submit(beetle8.reys_transmission_protocol, ('beetle-8'))
