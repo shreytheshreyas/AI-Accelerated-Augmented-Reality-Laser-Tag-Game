@@ -62,7 +62,7 @@ void loop() {
     IrReceiver.printIRResultShort(&Serial);
     Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);
     
-    if (IrReceiver.decodedIRData.command == 0x02) {   //if hit by player 1's shot
+    if (IrReceiver.decodedIRData.command == 0x02) {   //if hit by player 2's shot
       isShot = true;
            
       shotID = IrReceiver.decodedIRData.command;  //shotID of the player that hit you
@@ -83,6 +83,8 @@ void loop() {
           display.setSegments(DEAD);
           deadTune();
           delay(100);
+          health = 100;
+          display.setshowNumberDec(health);
         }
         else {
           display.showNumberDec(health);
