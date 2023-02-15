@@ -83,6 +83,8 @@ void loop() {
           display.setSegments(DEAD);
           deadTune();
           delay(100);
+          health = 100;
+          display.setshowNumberDec(health);
         }
         else {
           display.showNumberDec(health);

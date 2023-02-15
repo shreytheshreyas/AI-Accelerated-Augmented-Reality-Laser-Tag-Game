@@ -87,13 +87,13 @@ void loop() {
       delay(500);
       break;
 
-      case 7:
-      IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
-      Serial.println("signal has been sent");
-      Serial.println(buttonState);
-      tone(buzzerPin,NOTE_B6 ,100);
-      delay(500);
-      break;
+      // case 7:
+      // IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+      // Serial.println("signal has been sent");
+      // Serial.println(buttonState);
+      // tone(buzzerPin,NOTE_B6 ,100);
+      // delay(500);
+      // break;
 
       default:
       Serial.println("out of ammo");
