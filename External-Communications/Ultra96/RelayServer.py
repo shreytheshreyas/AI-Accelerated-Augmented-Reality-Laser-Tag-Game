@@ -23,7 +23,7 @@ class RelayServer:
 
         self.action_queue = action_queue
 
-        # TODO: Repalce
+        # TODO: Replace with actual HWAccel
         self.ai = HWAccel_Stub()
 
     def recv_msg(self, conn):
@@ -96,6 +96,7 @@ class RelayServer:
             if not msg:
                 break
             if msg != "hit":
+                print("Wrong action (hit)")
                 break
 
             action_queue.put((player, "hit"))

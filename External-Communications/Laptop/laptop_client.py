@@ -1,49 +1,45 @@
 import socket
-import sys
 
 from sshtunnel import open_tunnel
 
 
-PROMPT = """
-Choose one of the followingg beetle actions:
+PROMPT = """Choose one of the followingg beetle actions:
   1. Gun
   2. Vest
   3. Glove
   4. Quit
-Your choice: 
-"""
+Your choice: """
 
 
 # Communicates with eval_server
-class Client:
+class LaptopClient:
     def __init__(self, server_name, server_port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_name = server_name
         self.server_port = server_port
 
     def connect(self):
-        soc_tunnel = open_tunnel(
+        ssh_tunnel = open_tunnel(
             ("stu.comp.nus.edu", 22),
             ssh_username="kaijiel",
             remote_bind_address=(self.server_name, 22),
             block_on_close=False,
         )
-        soc_tunnel.start()
-        print("Connected to SOC tunnel")
+        ssh_tunnel.start()
+        print("Set up tunnel to Ultra96")
 
-        ultra96_tunnel = open_tunnel(
-            ssh_address_or_host=("127.0.0.1", soc_tunnel.local_bind_port),
+        server_tunnel = open_tunnel(
+            ssh_address_or_host=("127.0.0.1", ssh_tunnel.local_bind_port),
             remote_bind_address=("127.0.0.1", self.server_port),
             # ssh_password="xilinxB13capstone",
             ssh_password="xilinx",
             ssh_username="xilinx",
             block_on_close=False,
         )
-        ultra96_tunnel.start()
-        print(ultra96_tunnel.local_bind_port)
-        print("Connected to Ultra96 tunnel")
+        server_tunnel.start()
+        print("Set up tunnel to Server on Ultra96")
 
-        self.socket.connect(("localhost", ultra96_tunnel.local_bind_port))
+        self.socket.connect(("localhost", server_tunnel.local_bind_port))
         print("Connected to server on Ultra96")
 
     def recv_game_state(self):
@@ -103,7 +99,7 @@ class Client:
         sensor = ""
 
         while not sensor:
-            user_input = input(PROMPT.strip())
+            user_input = input(PROMPT)
 
             if user_input not in "1234":
                 print("Input invalid, try again")
@@ -120,8 +116,9 @@ class Client:
             return
 
         print("From server:", receivedMsg)
+        self.running = True
 
-        while True:
+        while self.running:
             user_input = input("Enter to continue/ q to quit: ")
             if user_input == "q":
                 break
@@ -141,8 +138,14 @@ class Client:
 
         self.socket.close()
 
+    def stop(self):
+        self.running = False
+
 
 if __name__ == "__main__":
-    client = Client("192.168.95.250", 8080)
+    client = LaptopClient("192.168.95.250", 8080)
     client.connect()
-    client.run()
+    try:
+        client.run()
+    except KeyboardInterrupt:
+        client.stop()

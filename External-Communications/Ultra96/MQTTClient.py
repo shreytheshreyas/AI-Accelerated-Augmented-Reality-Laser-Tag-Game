@@ -1,8 +1,10 @@
 import json
+import multiprocessing as mp
 
 import paho.mqtt.client as paho
 from paho import mqtt
-from paho.mqtt.packettypes import PacketTypes
+
+from Test import put_queue
 
 
 class MQTTClient:
@@ -19,7 +21,9 @@ class MQTTClient:
 
             with self.opp_in_frames.get_lock():
                 self.opp_in_frames[index] = int(msg_json["inFrame"])
-                print(f'OppInFrame updated - p1: {bool(self.opp_in_frames[0]} p2: {bool(self.opp_in_frames[1]}')
+                print(
+                    f"OppInFrame updated - p1: {bool(self.opp_in_frames[0])} p2: {bool(self.opp_in_frames[1])}"
+                )
 
         self.vis_queue = vis_queue
         self.opp_in_frames = opp_in_frames
@@ -77,7 +81,7 @@ if __name__ == "__main__":
     opp_in_frames = mp.Array("i", [0] * 2)
 
     mqtt_client = MQTTClient(vis_queue, opp_in_frames)
-    process = mp.Process(target=mqtt_client.run)
+    mqtt_process = mp.Process(target=mqtt_client.run)
     vis_process = mp.Process(
         target=put_queue,
         args=(

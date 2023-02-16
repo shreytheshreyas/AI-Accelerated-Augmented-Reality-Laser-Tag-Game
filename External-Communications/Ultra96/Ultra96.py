@@ -26,12 +26,14 @@ class Ultra96:
             self.opp_in_frames, self.action_queue, self.eval_req_queue, self.vis_queue
         )
 
-        self.eval_client = EvalClient(self.eval_req_queue, self.eval_resp_queue)
+        self.eval_client = EvalClient(
+            self.eval_host, self.eval_port, self.eval_req_queue, self.eval_resp_queue
+        )
         self.relay_server = RelayServer(self.host, self.port, self.action_queue)
         self.mqtt_client = MQTTClient(self.vis_queue, self.opp_in_frames)
 
     def setup_connections(self):
-        self.eval_client.connect(self.eval_host, self.eval_port)
+        self.eval_client.connect()
 
     def start_game(self):
         engine_process = mp.Process(target=self.engine.run)
