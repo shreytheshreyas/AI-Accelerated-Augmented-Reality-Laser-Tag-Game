@@ -332,7 +332,7 @@ class BlunoDevice:
     
     def establish_connection(self, text): 
         try:
-            self.peripheral = Peripheral(self.macAddress)
+            self.peripheral = Peripheral(self.macAddress,ADDR_TYPE_RANDOM)
             self.bluetoothInterfaceHandler = BluetoothInterfaceHandler(self.beetleId)
             self.peripheral.withDelegate(self.bluetoothInterfaceHandler)
             logging.info(f'Connection successfully established between the beetle-{self.beetleId} and relay node.') 
@@ -359,7 +359,6 @@ class BlunoDevice:
                     if not StatusManager.get_connection_status(self.beetleId):
                         self.establish_connection(self.beetleId)
                     self.handshake_mechanism()
-                
                 else:
                     #regular data transfer
                     logging.info(f'beetle-{self.beetleId}: regualar data transfer')
@@ -406,6 +405,6 @@ if __name__ == '__main__':
     
     logging.info('Instantiation of threads')
     with ThreadPoolExecutor(max_workers=1) as executor:
-        executor.submit(beetle1.transmission_protocol, ('beetle-1'))
+        executor.submit(beetle0.transmission_protocol, ('beetle-0'))
         #executor.submit(beetle7.transmission_protocol, ('beetle-7'))
         #executor.submit(beetle8.transmission_protocol, ('beetle-8'))
