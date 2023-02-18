@@ -35,15 +35,15 @@ VEST = 'V' #The ASCII code associated with V is 86
 
 
 MAC_ADDRESSES = {
-        0: "D0:39:72:BF:CA:D4",
-        1: "D0:39:72:BF:C3:8F",
-        2: "D0:39:72:BF:C8:D8",
-        3: "",
-        4: "",
-        5: "",
-        6: "D0:39:72:BF:C8:89",
-        7: "D0:39:72:BF:C8:D7",
-        8: "6C:79:B8:D3:6A:A3"
+        0: 'D0:39:72:BF:CA:D4',
+        1: 'D0:39:72:BF:C3:8F',
+        2: 'D0:39:72:BF:C8:D8',
+        3: 'a',
+        4: 'a',
+        5: 'a',
+        6: 'D0:39:72:BF:C8:89',
+        7: 'D0:39:72:BF:C8:D7',
+        8: '6C:79:B8:D3:6A:A3'
 }
 
 class StatisticsManager:
@@ -157,47 +157,66 @@ This is primarly used to access the following class level variables
 class StatusManager:
     
     connectionStatusFlags = [False] * NUM_OF_BEETLES   
+    resetStatusFlags = [False] * NUM_OF_BEETLES
     syncStatusFlags = [False] * NUM_OF_BEETLES 
     ackStatusFlags = [False] * NUM_OF_BEETLES 
     dataAckStatusFlags = [False] * NUM_OF_BEETLES 
     dataNackStatusFlags = [False] * NUM_OF_BEETLES
     
-    connectionStatusLock = threading.Lock()
-    syncStatusLock = threading.Lock()
-    ackStatusLock = threading.Lock()
-    dataAckStatusLock = threading.Lock()   
-    dataNackStatusLock = threading.Lock()
+    #connectionStatusLock = threading.Lock()
+    #resetStatusLock = threading.Lock()
+    #syncStatusLock = threading.Lock()
+    #ackStatusLock = threading.Lock()
+    #dataAckStatusLock = threading.Lock()   
+    #dataNackStatusLock = threading.Lock()
 
-    #METHODS ASSOCIATED WITH  BUFFER
+    #METHODS ASSOCIATED WITH CONNECTION BUFFER
     @classmethod
     def set_connection_status(cls, beetle_id):
-        cls.syncStatusLock.acquire()
-        cls.syncStatusFlags[beetle_id] = True
-        cls.syncStatusLock.release()
+        #cls.syncStatusLock.acquire()
+        cls.connectionStatusFlags[beetle_id] = True
+        #cls.syncStatusLock.release()
 
     @classmethod
     def clear_connection_status(cls, beetle_id):
-        cls.syncStatusLock.acquire()
-        cls.syncStausFlags[beetle_id] = False
-        cls.syncStatusLock.release()
+        #cls.syncStatusLock.acquire()
+        cls.connectionStatusFlags[beetle_id] = False
+        #cls.syncStatusLock.release()
 
     @classmethod
     def get_connection_status(cls, beetle_id):
-        return cls.syncStatusFlags[beetle_id]
+        return cls.connectionStatusFlags[beetle_id]
+ 
+    #METHODS ASSOCIATED WITH RESET BUFFER
+    @classmethod
+    def set_reset_status(cls, beetle_id):
+        #cls.resetStatusLock.acquire()
+        cls.resetStatusFlags[beetle_id] = True
+        #cls.resetStatusLock.release()
+
+    @classmethod
+    def clear_reset_status(cls, beetle_id):
+        #cls.resetStatusLock.acquire()
+        cls.resetStatusFlags[beetle_id] = False
+        #cls.resetStatusLock.release()
+
+    @classmethod
+    def get_reset_status(cls, beetle_id):
+        return cls.resetStatusFlags[beetle_id]
  
     
     #METHODS ASSOCIATED WITH SYNC BUFFER
     @classmethod
     def set_sync_status(cls, beetle_id):
-        cls.syncStatusLock.acquire()
+        #cls.syncStatusLock.acquire()
         cls.syncStatusFlags[beetle_id] = True
-        cls.syncStatusLock.release()
+        #cls.syncStatusLock.release()
 
     @classmethod
     def clear_sync_status(cls, beetle_id):
-        cls.syncStatusLock.acquire()
-        cls.syncStausFlags[beetle_id] = False
-        cls.syncStatusLock.release()
+        #cls.syncStatusLock.acquire()
+        cls.syncStatusFlags[beetle_id] = False
+        #cls.syncStatusLock.release()
 
     @classmethod
     def get_sync_status(cls, beetle_id):
@@ -208,15 +227,15 @@ class StatusManager:
     #METHODS ASSOCIATED WITH ACK BUFFER
     @classmethod
     def set_ack_status(cls, beetle_id):
-        cls.ackStatusLock.acquire()
-        cls.ackStausFlags[beetle_id] = True
-        cls.ackStatusLock.release()
+        #cls.ackStatusLock.acquire()
+        cls.ackStatusFlags[beetle_id] = True
+        #cls.ackStatusLock.release()
 
     @classmethod
     def clear_ack_status(cls, beetle_id):
-        cls.ackStatusLock.acquire()
+        #cls.ackStatusLock.acquire()
         cls.ackStatusFlags[beetle_id] = False
-        cls.ackStatusLock.release()
+        #cls.ackStatusLock.release()
 
     @classmethod
     def get_ack_status(cls, beetle_id):
@@ -226,15 +245,15 @@ class StatusManager:
     #METHODS ASSOCIATED WITH DATA-ACK BUFFER
     @classmethod
     def set_data_ack_status(cls, beetle_id):
-        cls.dataAckStatusLock.acquire()
+        #cls.dataAckStatusLock.acquire()
         cls.dataAckStatusFlags[beetle_id] = True
-        cls.dataAckStatusLock.release() 
+        #cls.dataAckStatusLock.release() 
 
     @classmethod
     def clear_data_ack_status(cls, beetle_id):
-        cls.dataAckStatusLock.acquire()
+        #cls.dataAckStatusLock.acquire()
         cls.dataAckStatusFlags[beetle_id] = False
-        cls.dataAckStatusLock.release() 
+        #cls.dataAckStatusLock.release() 
     
     @classmethod
     def get_data_ack_status(cls, beetle_id):
@@ -248,9 +267,9 @@ class StatusManager:
  
     @classmethod
     def clear_data_nack_status(cls, beetle_id):
-        cls.dataNackStatusLock.acquire()
+        #cls.dataNackStatusLock.acquire()
         cls.dataNackStatusFlags[beetle_id] = False
-        cls.dataNackStatusLock.release() 
+        #cls.dataNackStatusLock.release() 
 
     @classmethod
     def get_data_nack_status(cls, beetle_id):
@@ -264,44 +283,40 @@ class BluetoothInterfaceHandler(DefaultDelegate):
         self.receivingBuffer = b'' 
 
     def check_packet(self, packetData):
-        checksum = 0
-        
+        checksum = 0        
         for idx in range(len(packetData) - 1):
             checksum = (checksum ^ packetData[idx]) & 0xFF
-
         return  packetData[len(packetData) - 1] == checksum
 
     def handleNotification(self, cHandle, data):
-        self.receivingBuffer += data
-
-        if len(self.receivingBuffer) == 1 and self.receivingBuffer.decode(encoding='ascii') == 'A':
-            logging.info(f'The received information is as follows:\n')
-            logging.info(self.receivingBuffer.decode(encoding='ascii'))
-            logging.info(f'ACK received from beetle-{self.beetleId} successfully')
-            self.receivingBuffer = b''
-
-        elif len(self.receivingBuffer) >= 20:
-            packetData = bytearray(self.receivingBuffer[:20])
-            receivingBuffer = self.receivingBuffer[20:]
-            
-            sequenceNumber = struct.unpack('b', packetData[1:2])
-            packetType = struct.unpack('b', packetData[2:3])
-            actualCrcValue = struct.unpack('b', packetData[19:20])
-            isPacketCorrect = self.check_packet(packetData)
-            
-            if packetType == GUN:
-                print(f'RECEIVED GUN DATA FROM BEETLE- {self.beetleId}')
-                gunData = struct.unpack('b', packetData[3:4])
-                print(f'VALUE RETURNED BY GUN DATA = {gunData[0]}')
-                print(f'Sequence number of packet = {sequenceNumber}')
-                print(f'Packet type = {packetType}')
-                print(f'Packet is not corrupted = {isPacketCorrect}\n')
-
-        else: #Dealing with the case where data spans across multiple packets
-            print('Packet is fragmented')
-            pass
-
-
+        try:
+            self.receivingBuffer += data
+            #NEED TO USE THIS LOGS AGAIN TO WHEN SENDING RESET PACKET TO ARDUINO
+            #logging.info('IN HANDLE NOTIFICATIONS FUNCTION')
+            #logging.info(f'length of byte array = {len(self.receivingBuffer)}')
+            #logging.info(f'handleNotification: receive packet from beetle: {self.receivingBuffer}') 
+        
+            if len(self.receivingBuffer) == 1:
+                
+                if receivingBuffer.decode(encoding=='ascii') == RST:
+                    logging.info(f'The received information from {self.beetleId} is as follows:\n')
+                    logging.info(self.receivingBuffer.decode(encoding='ascii'))
+                    logging.info(f'RST received from beetle-{self.beetleId} successfully')
+                    StatusManager.set_reset_status(self.beetleId)
+                    
+                if self.receivingBuffer.decode(encoding='ascii') == 'A':
+                    logging.info(f'The received information from {self.beetleId} is as follows:\n')
+                    logging.info(self.receivingBuffer.decode(encoding='ascii'))
+                    logging.info(f'ACK received from beetle-{self.beetleId} successfully')
+                    StatusManager.set_sync_status(self.beetleId)
+                
+                self.receivingBuffer = b''
+        
+            else:
+                print('Packet is fragmented')
+             
+        except Exception as e: 
+            logging.info(f'handleNotfications: Something Went wrong. please see the exception message below:\n {e}')
 
 class BlunoDevice:
     def __init__(self, beetleId, macAddress):
@@ -309,50 +324,56 @@ class BlunoDevice:
         self.macAddress = macAddress
         self.peripheral = None
         self.blutoothInterfaceHandler = None
-
-    def establish_connection(self, text):
-        try:
-            self.peripheral = Peripheral(self.macAddress)
-            self.bluetoothInterfaceHandler = BluetoothInterfaceHandler(self.beetleId, self.wasWirelessDisconnected)
-            self.peripheral.withDelegate(self.bluetoothInterfaceHandler)  
-            StatusManager.set_connection_status(self.beetleId)
-            logging.info(f'Connection successfully established between the beetle-{self.beetleId} and relay node.')
-        except Exception as e:
-                logging.info(f'Could not connect to bluno device: {self.beetleId} due to the following exception.\n {e}')
+        self.isHandshakeCompleted = False
     
     def transmit_packet(self, data):
         for characteristic in self.peripheral.getCharacteristics():
-            characteristic.write(bytes(data,'ascii'), withResponse=False)
+            characteristic.write(bytes(data, 'ascii'), withResponse=False)
+    
+    def establish_connection(self, text): 
+        try:
+            self.peripheral = Peripheral(self.macAddress)
+            self.bluetoothInterfaceHandler = BluetoothInterfaceHandler(self.beetleId)
+            self.peripheral.withDelegate(self.bluetoothInterfaceHandler)
+            logging.info(f'Connection successfully established between the beetle-{self.beetleId} and relay node.') 
+        except Exception as e:
+            logging.info(f'Could not connect to bluno device: {self.beetleId} due to the following exception.\n {e}')
 
-    def handshake_mechanism(self, isHandshakeCompleted):
+    def handshake_mechanism(self):
         if StatusManager.get_connection_status(self.beetleId):
             self.transmit_packet(SYNC)
-            waitForNotification(1.0) 
+            self.peripheral.waitForNotifications(1.0) 
 
-            if StatusManager.get_sync_status[self.beetleId]:
-                self.trasmit_packet(ACK)
+            if StatusManager.get_sync_status(self.beetleId):
+                self.transmit_packet(ACK)
                 StatusManager.set_ack_status(self.beetleId)
-                isHandshakeCompleted = True 
-                logging.info(f'Handshake Completed for beetle-{self.beetleId}')
-
-        return isHandshakeCompleted
+                self.isHandshakeCompleted = True 
+                logging.info(f'Handshake Completed for beetle-{self.beetleId}\n')
+        
+        #logging.info(f'handshake_mechanism: isHandshakeComplete = {self.isHandshakeCompleted}')
     
     def transmission_protocol(self,text):
-        isHandshakeCompleted = False
         while True:
             try:
-                if not isHandshakeCompleted:
+                if not self.isHandshakeCompleted:
                     if not StatusManager.get_connection_status(self.beetleId):
                         self.establish_connection(self.beetleId)
-                    isHandshakeCompleted = self.handshake_mechanism(isHandshakeCompleted)
+                    self.handshake_mechanism()
+                
                 else:
                     #regular data transfer
-                    logging.info(f'{self.beetleID} -> regualar data transfer')
-                    
+                    logging.info(f'beetle-{self.beetleId}: regualar data transfer')
+                    break    
+            except Exception as e:
+                logging.info(f'Something went wrong due to the following error: \n {e}')
+            
+            '''
             except KeyboardInterrupt:
                 self.peripheral.disconnect()
-
+            
+            
             except (BTLEDisconnectError, AttributeError):
+
                 logging.info(f'Beetle-{self.beetleId} been disconnected due to a significantly large distance from the relay node')
                 logging.info(f'Attempting Reconnection')
                 isHandshakeCompleted = False
@@ -360,16 +381,18 @@ class BlunoDevice:
                 StatusManager.clear_sync_status(self.beetleId)
                 StatusManager.clear_ack_status(self.beetleId)
                 StatusManager.clear_data_ack_status(self.beetleId)
-                StatusManager.clear_data_nack_status(self.beetleID)
-
+                StatusManager.clear_data_nack_status(self.beetleId)
+            
+            '''
+            
 if __name__ == '__main__':
     
     format = "%(asctime)s: %(message)s"
     logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")  
     #Player-1
-    #beetle0 = BlunoDevice(PLAYER_1_GUN, MAC_ADDRESSES[PLAYER_1_GUN])
-    #beetle1 = BlunoDevice(PLAYER_1_VEST, MAC_ADDRESSES[PLAYER_1_VEST])
-    #beetle2 = BlunoDevice(PLAYER_1_MPU, MAC_ADDRESSES[PLAYER_1_MPU])
+    beetle0 = BlunoDevice(PLAYER_1_GUN, MAC_ADDRESSES[PLAYER_1_GUN])
+    beetle1 = BlunoDevice(PLAYER_1_VEST, MAC_ADDRESSES[PLAYER_1_VEST])
+    beetle2 = BlunoDevice(PLAYER_1_MPU, MAC_ADDRESSES[PLAYER_1_MPU])
     
     #Player-2
     #beetle3 = BlunoDevice(PLAYER_2_GUN, MAC_ADDRESSES[PLAYER_2_GUN])
@@ -377,12 +400,12 @@ if __name__ == '__main__':
     #beetle5 = BlunoDevice(PLAYER_2_MPU, MAC_ADDRESSES[PLAYER_2_MPU])
     
     #Testers
-    beetle6 = BlunoDevice(TEST_GUN, MAC_ADDRESSES[TEST_GUN])
-    beetle7 = BlunoDevice(TEST_VEST, MAC_ADDRESSES[TEST_VEST])
-    beetle8 = BlunoDevice(TEST_MPU, MAC_ADDRESSES[TEST_MPU])
+    #beetle6 = BlunoDevice(TEST_GUN, MAC_ADDRESSES[TEST_GUN])
+    #beetle7 = BlunoDevice(TEST_VEST, MAC_ADDRESSES[TEST_VEST])
+    #beetle8 = BlunoDevice(TEST_MPU, MAC_ADDRESSES[TEST_MPU])
     
     logging.info('Instantiation of threads')
     with ThreadPoolExecutor(max_workers=1) as executor:
-        executor.submit(beetle6.transmission_protocol, ('beetle-6'))
+        executor.submit(beetle1.transmission_protocol, ('beetle-1'))
         #executor.submit(beetle7.transmission_protocol, ('beetle-7'))
         #executor.submit(beetle8.transmission_protocol, ('beetle-8'))
