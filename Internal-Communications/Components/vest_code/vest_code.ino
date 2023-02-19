@@ -2,7 +2,7 @@
 #define PACKET_SIZE 20
 #define SENSOR_DATA 20
 #define DATA_RATE 115200
-
+#define TIMEOUT 2000
 //Defining packet types
 #define SYNC 'S'
 #define ACK 'A'
@@ -11,18 +11,22 @@
 #define DATA_NACK 'N'
 #define RST 'R'
 #define RST_ACK 'r'
+#define FIN 'F'
 
 //Class definition for protocol
 class Protocol {
   private:
     int sensorDataIdx;
     int sequenceNumber;
+    int previousTime;
+    int currentTime;
     int sensorData[SENSOR_DATA];
-    uint8_t packet[PACKET_SIZE];
+    byte packet[PACKET_SIZE];
 
   public:
     Protocol();
     int calculate_checksum(void);
+    void clear_serial_buffer(void);
     void get_sensor_data(void);
     void initialize_packet_data(void);
     void start_communication(void);
@@ -38,12 +42,14 @@ Protocol* communicationProtocol;
 Protocol::Protocol() {
   this->sensorDataIdx = 0; 
   this->sequenceNumber = 0;
-
+  this->previousTime = 0;
+  this->currentTime = 0;
+  
   for(int idx = 0; idx < SENSOR_DATA; idx++)
-    this->sensorData[idx] = 10; //In acutal implementation will change to 0
+    this->sensorData[idx] = 10 + idx; //In acutal implementation will change to 0
 
   for(int idx = 0; idx < PACKET_SIZE; idx++)
-    this->sensorData[idx] = 0;
+    this->packet[idx] = 0;
 }
 
 int Protocol::calculate_checksum(void) {
@@ -55,6 +61,10 @@ int Protocol::calculate_checksum(void) {
   return checksum;
 }
 
+void Protocol::clear_serial_buffer() {
+  while(Serial.available()) 
+    byte dummy = Serial.read();
+}
 
 void Protocol::get_sensor_data() {
   return;
@@ -68,41 +78,54 @@ void Protocol::initialize_packet_data() {
 }
 
 void Protocol::start_communication() {
-  if (Serial.available()) {
-    uint8_t receivedData = Serial.read();
+   currentTime = millis();
 
-    if (hasHandshakeEnded) {
+//    if (!Serial.available())
+//      return;
       
-      if (receivedData == DATA_ACK) {
-        this->sequenceNumber++;
-        this->sensorDataIdx = (this->sensorDataIdx + 1) % 20; 
-      }
-
-      if (receivedData == DATA_NACK){  
-      //TODO: Might need some code over here to integration phase
-      }
-
-      Serial.write((uint8_t*) &packet, sizeof(packet));
-    }
+    byte receivedData = Serial.read();
 
     switch(receivedData) {
-      case SYNC: hasHandshakeStarted = true;
+      case SYNC: 
+                 hasHandshakeStarted = true;
                  hasHandshakeEnded = false;
                  Serial.write(ACK);
                  break;
 
-      case ACK: hasHandshakeStarted = false;
+      case ACK: 
+                hasHandshakeStarted = false;
                 hasHandshakeEnded = true;
                 break;
 
+      case DATA_ACK: 
+                this->sequenceNumber++;
+                this->sensorDataIdx = (this->sensorDataIdx + 1) % 20;
+                
+                break;
+
+      case DATA_NACK:
+                //Some code to handle this scenario
+                break;
+                
       case RST: hasHandshakeStarted = false;
                 hasHandshakeEnded = false;
-                Serial.write(RST_ACK);
+//                this->clear_serial_buffer();
+                Serial.write(RST);
+                break;
+
+      case FIN: 
+                //Some code to handle this scenario
                 break;
     }
+
+  if ( (hasHandshakeEnded) && (currentTime -  previousTime > TIMEOUT) &&  receivedData != ACK) { 
+    Serial.write((byte*)&packet, sizeof(packet));
+    previousTime = currentTime;
   }
-  
+
+  this->clear_serial_buffer();
 }
+
 void setup() {
   Serial.begin(DATA_RATE);
   hasHandshakeStarted = false;
@@ -111,6 +134,8 @@ void setup() {
 }
 
 void loop() {
-  communicationProtocol->get_sensor_data();
+//  Serial.flush();
+  communicationProtocol->initialize_packet_data();
   communicationProtocol->start_communication();
+//  communicationProtocol->clear_serial_buffer();
 }
