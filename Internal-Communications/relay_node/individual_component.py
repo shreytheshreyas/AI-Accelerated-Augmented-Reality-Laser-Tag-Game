@@ -331,15 +331,17 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         logging.info(f'sequence-number = {sequenceNumber}')
                         logging.info(f'value received from gun = {gunData}')
                         logging.info(f'is the packet corrupted = {not isPacketCorrect}')
-
+                  
                     if chr(packetType) == VEST:
+                        print('##########RECEIVED-VEST-DATA###############')
                         vestData = struct.unpack('B', packetData[2:3])[0]
-                        logging.info(f'packet-type = {packetType}')
+                        logging.info(f'packet-type = {chr(packetType)}')
                         logging.info(f'sequence-number = {sequenceNumber}')
-                        logging.info(f'value received from vest = {gunData}')
+                        logging.info(f'value received from vest = {vestData}')
                         logging.info(f'is the packet corrupted = {not isPacketCorrect}')
 
                     if chr(packetType) == IMU: 
+                        print('##########RECEIVED-IMU-DATA###############')
                         imuDataLinearAccelX = struct.unpack('B', packetData[2:3])[0]
                         imuDataLinearAccelY = struct.unpack('B', packetData[3:4])[0]
                         imuDataLinearAccelZ = struct.unpack('B', packetData[4:5])[0]
@@ -378,8 +380,14 @@ class BlunoDevice:
         #self.isHandshakeCompleted = False
     
     def transmit_packet(self, data):
-        for characteristic in self.peripheral.getCharacteristics():
-            characteristic.write(bytes(data, 'ascii'), withResponse=False)
+        try:
+            for characteristic in self.peripheral.getCharacteristics():
+                characteristic.write(bytes(data, 'ascii'), withResponse=False)
+        except (BTLEDisconnectError, AttributeError):
+            pass
+        except Exception as e:
+            logging.info(f'Some thing went wrong while trying to transmit packet to {self.beetleId}, please refer to the following exception:\n {e}')
+        
     
     def establish_connection(self): 
         try:
@@ -392,9 +400,14 @@ class BlunoDevice:
             logging.info(f'Could not connect to bluno device: {self.beetleId} due to the following exception.\n {e}')
 
     def reset_controller(self):
-        self.transmit_packet(RST)
-        self.peripheral.waitForNotifications(1.0)
-
+        try:
+            self.transmit_packet(RST)
+            self.peripheral.waitForNotifications(1.0)
+        except (BTLEDisconnectError, AttributeError):
+            pass
+        except Exception as e:
+            logging.info(f'Some thing went wrong while trying to reset {self.beetleId}, please refer to the following exception:\n {e}')
+        
     def handshake_mechanism(self, isHandshakeCompleted):
         if StatusManager.get_connection_status(self.beetleId):
             self.transmit_packet(SYNC)
@@ -426,7 +439,7 @@ class BlunoDevice:
                     #logging.info(f'{self.beetleId} - regular data transfer')
 
                     #logging.info('Before waiting for notification')
-                    self.peripheral.waitForNotifications(1.0)
+                    self.peripheral.waitForNotifications(3.0)
                     #logging.info('After waiting for notification')
 
                     if StatusManager.get_data_ack_status(self.beetleId):
@@ -455,11 +468,12 @@ class BlunoDevice:
                 logging.info(f'Attempting Reconnection')
                 isHandshakeCompleted = False
                 StatusManager.clear_connection_status(self.beetleId)
+                StatusManager.clear_reset_status(self.beetleId)
                 StatusManager.clear_sync_status(self.beetleId)
                 StatusManager.clear_ack_status(self.beetleId)
                 StatusManager.clear_data_ack_status(self.beetleId)
                 StatusManager.clear_data_nack_status(self.beetleId)
-            
+                pass            
             
 if __name__ == '__main__':
     
@@ -490,8 +504,8 @@ if __name__ == '__main__':
     #beetleThread4 = threading.Thread(target=beetle4.establish_connection, args=())
     #beetleThread5 = threading.Thread(target=beetle5.establish_connection, args=())
     beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
-    #beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=())
-    #beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
+    beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=())
+    beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
     
     #Starting beetle Threads
     #beetleThread0.start()
@@ -501,8 +515,8 @@ if __name__ == '__main__':
     #beetleThread4.start()
     #beetleThread5.start()
     beetleThread6.start()
-    #beetleThread7.start()
-    #beetleThread8.start()
+    beetleThread7.start()
+    beetleThread8.start()
 
     #Terminating beetle Threads
     #beetleThread0.join()
@@ -512,6 +526,6 @@ if __name__ == '__main__':
     #beetleThread4.join()
     #beetleThread5.join()
     beetleThread6.join()
-    #beetleThread7.join()
-    #beetleThread8.join()
+    beetleThread7.join()
+    beetleThread8.join()
 
