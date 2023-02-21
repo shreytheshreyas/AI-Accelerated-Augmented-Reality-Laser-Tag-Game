@@ -392,15 +392,15 @@ class BluetoothInterfaceHandler(DefaultDelegate):
             self.receivingBuffer += data 
             if len(self.receivingBuffer) == 1: 
                 if self.receivingBuffer.decode('ascii') == RST:
-                    logging.info(f'The received information from {self.beetleId} is as follows:\n')
-                    logging.info(self.receivingBuffer.decode(encoding='ascii'))
-                    logging.info(f'RST received from beetle-{self.beetleId} successfully')
+                    #logging.info(f'The received information from {self.beetleId} is as follows:\n')
+                    #logging.info(self.receivingBuffer.decode(encoding='ascii'))
+                    #logging.info(f'RST received from beetle-{self.beetleId} successfully')
                     StatusManager.set_reset_status(self.beetleId)
                     
                 if self.receivingBuffer.decode('ascii') == ACK:
-                    logging.info(f'The received information from {self.beetleId} is as follows:\n')
-                    logging.info(self.receivingBuffer.decode(encoding='ascii'))
-                    logging.info(f'ACK received from beetle-{self.beetleId} successfully')
+                    #logging.info(f'The received information from {self.beetleId} is as follows:\n')
+                    #logging.info(self.receivingBuffer.decode(encoding='ascii'))
+                    #logging.info(f'ACK received from beetle-{self.beetleId} successfully')
                     StatusManager.set_sync_status(self.beetleId)
                 
                 self.receivingBuffer = b''
@@ -542,7 +542,6 @@ class BlunoDevice:
                         StatisticsManager.clear_data_rate(self.beetleId)
                         StatisticsManager.set_start_time(self.beetleId)
                     isHandshakeCompleted = self.handshake_mechanism(isHandshakeCompleted)
-                    #logging.info(isHandshakeCompleted)
                 else:
                     #regular data transfer
                     StatisticsManager.display_statistics()
