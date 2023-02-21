@@ -94,38 +94,47 @@ class StatisticsManager:
     
     @classmethod
     def display_statistics(cls):
+        connectionStatus = {True: 'Connected', False: 'Disconnected'}
+        handshakeStatus = {True: 'Completed', False: 'Not-Completed'}
+
         system('clear')
         print('\r')
         
         if cls.dataReceived[TEST_GUN] is not None:
             print(f'GUN-DATA #######################################################################################################################################################################')
             print(f'Beetle-Id = {TEST_GUN}')
+            print(f'Connection-Status = {connectionStatus[StatusManager.get_connection_status(TEST_GUN)]}')
+            print(f'Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(TEST_GUN)]}')
             print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_GUN]}')
-            print(f'Packet-Type = {cls.dataReceived[TEST_GUN]["packetType"]}')
+            #print(f'Packet-Type = {cls.dataReceived[TEST_GUN]["packetType"]}')
             print(f'sequenceNumber = {cls.dataReceived[TEST_GUN]["sequenceNumber"]}')
             print(f'Value received from GUN = {cls.dataReceived[TEST_GUN]["dataValue"]}')
             print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_GUN]}')
-            print(f'Is packet corrupted  = {cls.dataReceived[TEST_GUN]["isPacketCorrupted"]} \n')
-        else:
-            print('could not print data')
+            #print(f'Is packet corrupted  = {cls.dataReceived[TEST_GUN]["isPacketCorrupted"]} \n')
+        else: 
+            print('################NO-GUN-DATA-AVAILABLE######################')
         
         if cls.dataReceived[TEST_VEST] is not None:
             print(f'VEST-DATA #######################################################################################################################################################################')
             print(f'Beetle-Id = {TEST_VEST}')
+            print(f'Connection-Status = {connectionStatus[StatusManager.get_connection_status(TEST_VEST)]}')
+            print(f'Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(TEST_VEST)]}')
             print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_VEST]}')
-            print(f'Packet-Type = {cls.dataReceived[TEST_VEST]["packetType"]}')
+            #print(f'Packet-Type = {cls.dataReceived[TEST_VEST]["packetType"]}')
             print(f'sequenceNumber = {cls.dataReceived[TEST_VEST]["sequenceNumber"]}')
             print(f'Value received from GUN = {cls.dataReceived[TEST_VEST]["dataValue"]}')
             print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_VEST]}')
-            print(f'Is packet corrupted  = {cls.dataReceived[TEST_VEST]["isPacketCorrupted"]}\n')
+            #print(f'Is packet corrupted  = {cls.dataReceived[TEST_VEST]["isPacketCorrupted"]}\n')
         else:
-            print('could not print data')
-
+            print('################NO-VEST-DATA-AVAILABLE######################')
+    
         if cls.dataReceived[TEST_IMU] is not None:
             print(f'IMU-DATA #########################################################################################################################################################################')
-            print(f'Beetle-Id = {TEST_IMU}')
+            print(f'Beetle-Id = {TEST_IMU}') 
+            print(f'Connection-Status = {connectionStatus[StatusManager.get_connection_status(TEST_IMU)]}')
+            print(f'Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(TEST_IMU)]}')
             print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_IMU]}')
-            print(f'Packet-Type = {cls.dataReceived[TEST_IMU]["packetType"]}')
+            #print(f'Packet-Type = {cls.dataReceived[TEST_IMU]["packetType"]}')
             print(f'sequenceNumber = {cls.dataReceived[TEST_IMU]["sequenceNumber"]}')
             print(f'Linear-Acceleration-X = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataLinearAccelX"]}')
             print(f'Linear-Acceleration-Y = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataLinearAccelY"]}')
@@ -134,9 +143,9 @@ class StatisticsManager:
             print(f'Gyro-Acceleration-Z = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataGyroAccelY"]}')
             print(f'Gyro-Acceleration-Z = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataGyroAccelZ"]}')
             print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_IMU]}')
-            print(f'Is packet corrupted  = {cls.dataReceived[TEST_IMU]["isPacketCorrupted"]}')
+            #print(f'Is packet corrupted  = {cls.dataReceived[TEST_IMU]["isPacketCorrupted"]}')
         else:
-            print('could not print data')
+            print('################NO-IMU-DATA-AVAILABLE######################')
 
 '''
 BufferManager DOCUMENTATION
