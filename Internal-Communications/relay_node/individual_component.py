@@ -552,7 +552,7 @@ class BlunoDevice:
                     #logging.info(f'{self.beetleId} - regular data transfer')
 
                     #logging.info('Before waiting for notification')
-                    self.peripheral.waitForNotifications(3.0)
+                    self.peripheral.waitForNotifications(4.0)
                     #logging.info('After waiting for notification')
 
                     if StatusManager.get_data_ack_status(self.beetleId):
