@@ -70,15 +70,17 @@ class StatisticsManager:
 
     @classmethod
     def calculate_data_rate(cls, beetleId):
-        #cls.totalNumOfBytesReceivedLock.acquire()
-        cls.totalNumOfBytesReceived[beetleId] += 20
-        #cls.totalNumOfBytesReceivedLock.release()
-
-        resultantDataRate = (cls.totalNumOfBytesReceived[beetleId] * 8) / (1000 * (datetime.now() - cls.beetlesStartTime[beetleId]).total_seconds())
-        #cls.dataRateLock.acquire()
-        cls.beetlesKbps[beetleId] = resultantDataRate
-        #cls.dataRateLock.release()
+        try:
+            #cls.totalNumOfBytesReceivedLock.acquire()
+            cls.totalNumOfBytesReceived[beetleId] += 20
+            #cls.totalNumOfBytesReceivedLock.release()
     
+            resultantDataRate = (cls.totalNumOfBytesReceived[beetleId] * 8) / (1000 * (datetime.now() - cls.beetlesStartTime[beetleId]).total_seconds())
+            #cls.dataRateLock.acquire()
+            cls.beetlesKbps[beetleId] = resultantDataRate
+            #cls.dataRateLock.release()
+        except Exception as e:
+            pass
     @classmethod
     def increment_num_fragmented_packets(cls, beetleId):
         cls.fragementedPacketCounterLock.acquire()
@@ -106,13 +108,11 @@ class StatisticsManager:
             print(f'Connection-Status = {connectionStatus[StatusManager.get_connection_status(TEST_GUN)]}')
             print(f'Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(TEST_GUN)]}')
             print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_GUN]}')
-            #print(f'Packet-Type = {cls.dataReceived[TEST_GUN]["packetType"]}')
             print(f'sequenceNumber = {cls.dataReceived[TEST_GUN]["sequenceNumber"]}')
             print(f'Value received from GUN = {cls.dataReceived[TEST_GUN]["dataValue"]}')
-            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_GUN]}')
-            #print(f'Is packet corrupted  = {cls.dataReceived[TEST_GUN]["isPacketCorrupted"]} \n')
+            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_GUN]}\n')
         else: 
-            print('################NO-GUN-DATA-AVAILABLE######################')
+            print('################ NO-GUN-DATA-AVAILABLE ######################\n')
         
         if cls.dataReceived[TEST_VEST] is not None:
             print(f'VEST-DATA #######################################################################################################################################################################')
@@ -120,13 +120,11 @@ class StatisticsManager:
             print(f'Connection-Status = {connectionStatus[StatusManager.get_connection_status(TEST_VEST)]}')
             print(f'Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(TEST_VEST)]}')
             print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_VEST]}')
-            #print(f'Packet-Type = {cls.dataReceived[TEST_VEST]["packetType"]}')
             print(f'sequenceNumber = {cls.dataReceived[TEST_VEST]["sequenceNumber"]}')
             print(f'Value received from GUN = {cls.dataReceived[TEST_VEST]["dataValue"]}')
-            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_VEST]}')
-            #print(f'Is packet corrupted  = {cls.dataReceived[TEST_VEST]["isPacketCorrupted"]}\n')
+            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_VEST]}\n')
         else:
-            print('################NO-VEST-DATA-AVAILABLE######################')
+            print('################ NO-VEST-DATA-AVAILABLE ######################\n')
     
         if cls.dataReceived[TEST_IMU] is not None:
             print(f'IMU-DATA #########################################################################################################################################################################')
@@ -134,7 +132,6 @@ class StatisticsManager:
             print(f'Connection-Status = {connectionStatus[StatusManager.get_connection_status(TEST_IMU)]}')
             print(f'Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(TEST_IMU)]}')
             print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_IMU]}')
-            #print(f'Packet-Type = {cls.dataReceived[TEST_IMU]["packetType"]}')
             print(f'sequenceNumber = {cls.dataReceived[TEST_IMU]["sequenceNumber"]}')
             print(f'Linear-Acceleration-X = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataLinearAccelX"]}')
             print(f'Linear-Acceleration-Y = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataLinearAccelY"]}')
@@ -142,10 +139,9 @@ class StatisticsManager:
             print(f'Gyro-Acceleration-Y = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataGyroAccelX"]}')
             print(f'Gyro-Acceleration-Z = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataGyroAccelY"]}')
             print(f'Gyro-Acceleration-Z = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataGyroAccelZ"]}')
-            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_IMU]}')
-            #print(f'Is packet corrupted  = {cls.dataReceived[TEST_IMU]["isPacketCorrupted"]}')
+            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_IMU]}\n')
         else:
-            print('################NO-IMU-DATA-AVAILABLE######################')
+            print('################ NO-IMU-DATA-AVAILABLE ######################\n')
 
 '''
 BufferManager DOCUMENTATION
@@ -392,15 +388,9 @@ class BluetoothInterfaceHandler(DefaultDelegate):
             self.receivingBuffer += data 
             if len(self.receivingBuffer) == 1: 
                 if self.receivingBuffer.decode('ascii') == RST:
-                    #logging.info(f'The received information from {self.beetleId} is as follows:\n')
-                    #logging.info(self.receivingBuffer.decode(encoding='ascii'))
-                    #logging.info(f'RST received from beetle-{self.beetleId} successfully')
                     StatusManager.set_reset_status(self.beetleId)
                     
                 if self.receivingBuffer.decode('ascii') == ACK:
-                    #logging.info(f'The received information from {self.beetleId} is as follows:\n')
-                    #logging.info(self.receivingBuffer.decode(encoding='ascii'))
-                    #logging.info(f'ACK received from beetle-{self.beetleId} successfully')
                     StatusManager.set_sync_status(self.beetleId)
                 
                 self.receivingBuffer = b''
@@ -410,18 +400,11 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                 self.receivingBuffer = self.receivingBuffer[20:]
                 data = {}
                 isPacketCorrect = self.verify_checksum(packetData)
-                #logging.info(f'checksum = {isPacketCorrect}')
-                #packetType = struct.unpack('b', packetData[1:2])[0]
-                #gunData = struct.unpack('b', packetData[2:3])[0]
-                #sequenceNumber = struct.unpack('b', packetData[0:1])[0] 
-                #logging.info(f'packetType = {packetType}')
-                #logging.info(f'gunData = {gunData}')
-                #logging.info(f'sequenceNumber = {sequenceNumber}')
 
                 if isPacketCorrect == True:
                     sequenceNumber = struct.unpack('b', packetData[0:1])[0]
                     packetType = struct.unpack('b', packetData[1:2])[0]
-                    #logging.info(f'packetType = {packetType}')
+                
                     if chr(packetType) == GUN:
                         gunData = struct.unpack('B', packetData[2:3])[0]
                         data['beetleId'] = self.beetleId
@@ -485,7 +468,7 @@ class BlunoDevice:
         self.macAddress = macAddress
         self.peripheral = None
         self.blutoothInterfaceHandler = None
-        #self.isHandshakeCompleted = False
+
     
     def transmit_packet(self, data):
         try:
@@ -545,10 +528,7 @@ class BlunoDevice:
                 else:
                     #regular data transfer
                     StatisticsManager.display_statistics()
-                    #logging.info(f'{self.beetleId} - regular data transfer')
-                    #logging.info('Before waiting for notification')
                     self.peripheral.waitForNotifications(1.0)
-                    #logging.info('After waiting for notification')
 
                     if StatusManager.get_data_ack_status(self.beetleId):
                         self.transmit_packet(DATA_ACK)
@@ -556,13 +536,7 @@ class BlunoDevice:
 
                     if StatusManager.get_data_nack_status(self.beetleId):
                         self.transmit_packet(DATA_NACK)
-                        StatusManager.clear_data_nack_status(self.beetleId)
-                    
-                    print('\n')
-                    #self.peripheral.disconnect()
-                    #logging.info(f'beetle-{self.beetleId} is disconnected')
-                    #logging.info(f'beetle-{self.beetleId}: regualar data transfer')
-                     
+                        StatusManager.clear_data_nack_status(self.beetleId)                     
             
             except KeyboardInterrupt:
                 logging('Program terminated due a keyboard interrupt')
