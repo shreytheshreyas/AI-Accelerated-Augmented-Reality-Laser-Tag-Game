@@ -16,13 +16,13 @@ DATA_BUFFER_SIZE = 20
 #BLUNO ID's for the respective players 
 PLAYER_1_GUN = 0
 PLAYER_1_VEST = 1
-PLAYER_1_MPU = 2
+PLAYER_1_IMU = 2
 PLAYER_2_GUN = 3
 PLAYER_2_VEST = 4
-PLAYER_2_MPU = 5
+PLAYER_2_IMU = 5
 TEST_GUN = 6
 TEST_VEST = 7
-TEST_MPU = 8
+TEST_IMU = 8
 
 #Constants for packet types 
 SYNC = 'S' #Packet type for handshake. 
@@ -51,7 +51,7 @@ class StatisticsManager:
     beetlesKbps = [0] * NUM_OF_BEETLES
     totalNumOfBytesReceived = [0] * NUM_OF_BEETLES
     beetlesStartTime = [0] * NUM_OF_BEETLES
-    dataReceived = [0] * NUM_OF_BEETLES
+    dataReceived = [None] * NUM_OF_BEETLES
     fragmentedPacketCounter = [0] * NUM_OF_BEETLES
 
     dataRateLock = threading.Lock()
@@ -70,66 +70,74 @@ class StatisticsManager:
 
     @classmethod
     def calculate_data_rate(cls, beetleId):
-        cls.totalNumOfBytesReceivedLock.acquire()
+        #cls.totalNumOfBytesReceivedLock.acquire()
         cls.totalNumOfBytesReceived[beetleId] += 20
-        cls.totalNumOfBytesReceivedLock.release()
+        #cls.totalNumOfBytesReceivedLock.release()
 
         resultantDataRate = (cls.totalNumOfBytesReceived[beetleId] * 8) / (1000 * (datetime.now() - cls.beetlesStartTime[beetleId]).total_seconds())
-        cls.dataRateLock.acquire()
+        #cls.dataRateLock.acquire()
         cls.beetlesKbps[beetleId] = resultantDataRate
-        cls.dataRateLock.release()
+        #cls.dataRateLock.release()
     
     @classmethod
     def increment_num_fragmented_packets(cls, beetleId):
         cls.fragementedPacketCounterLock.acquire()
         cls.fragmentedPacketCounter[beetleId] += 1
         cls.fragmentedPacketCounterLock.release()
-
+    
     @classmethod
-    def display_statistics(cls, beetleId, data):
+    def set_beetle_statistics(cls, beetleId, data):
+        #cls.dataReceivedLock.acquire()
+        cls.dataReceived[beetleId] = data
+        #cls.dataReceived.release()
+        cls.calculate_data_rate(beetleId)
+    
+    @classmethod
+    def display_statistics(cls):
         system('clear')
         print('\r')
-
-        dataType = data['packetType']
-
-        if dataType == GUN:
-            cls.calculate_data_rate(beetleId)
+        
+        if cls.dataReceived[TEST_GUN] is not None:
             print(f'GUN-DATA #######################################################################################################################################################################')
-            print(f'Beetle-Id = {beetleId}')
-            print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[beetleId]}')
-            print(f'Packet-Type = {data["packetType"]}')
-            print(f'sequenceNumber = {data["sequenceNumber"]}')
-            print(f'Value received from GUN = {data["dataValue"]}')
-            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[beetleId]}')
-            print(f'Is packet corrupted  = {data["isPacketCorrupted"]}')
+            print(f'Beetle-Id = {TEST_GUN}')
+            print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_GUN]}')
+            print(f'Packet-Type = {cls.dataReceived[TEST_GUN]["packetType"]}')
+            print(f'sequenceNumber = {cls.dataReceived[TEST_GUN]["sequenceNumber"]}')
+            print(f'Value received from GUN = {cls.dataReceived[TEST_GUN]["dataValue"]}')
+            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_GUN]}')
+            print(f'Is packet corrupted  = {cls.dataReceived[TEST_GUN]["isPacketCorrupted"]} \n')
+        else:
+            print('could not print data')
         
-        
-        elif dataType == VEST:
-            cls.calculate_data_rate(beetleId) 
+        if cls.dataReceived[TEST_VEST] is not None:
             print(f'VEST-DATA #######################################################################################################################################################################')
-            print(f'Beetle-Id = {beetleId}')
-            print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[beetleId]}')
-            print(f'Packet-Type = {data["packetType"]}')
-            print(f'sequenceNumber = {data["sequenceNumber"]}')
-            print(f'Value received from VEST = {data["dataValue"]}')
-            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[beetleId]}')
-            print(f'Is packet corrupted  = {data["isPacketCorrupted"]}')
-         
-        elif dataType == IMU:
-            cls.calculate_data_rate(beetleId)
+            print(f'Beetle-Id = {TEST_VEST}')
+            print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_VEST]}')
+            print(f'Packet-Type = {cls.dataReceived[TEST_VEST]["packetType"]}')
+            print(f'sequenceNumber = {cls.dataReceived[TEST_VEST]["sequenceNumber"]}')
+            print(f'Value received from GUN = {cls.dataReceived[TEST_VEST]["dataValue"]}')
+            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_VEST]}')
+            print(f'Is packet corrupted  = {cls.dataReceived[TEST_VEST]["isPacketCorrupted"]}\n')
+        else:
+            print('could not print data')
+
+        if cls.dataReceived[TEST_IMU] is not None:
             print(f'IMU-DATA #########################################################################################################################################################################')
-            print(f'Beetle-Id = {beetleId}')
-            print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[beetleId]}')
-            print(f'Packet-Type = {data["packetType"]}')
-            print(f'sequenceNumber = {data["sequenceNumber"]}')
-            print(f'Linear-Acceleration-X = {data["dataValue"]["imuDataLinearAccelX"]}')
-            print(f'Linear-Acceleration-Y = {data["dataValue"]["imuDataLinearAccelY"]}')
-            print(f'Linear-Acceleration-Z = {data["dataValue"]["imuDataLinearAccelZ"]}')
-            print(f'Gyro-Acceleration-Y = {data["dataValue"]["imuDataGyroAccelX"]}')
-            print(f'Gyro-Acceleration-Z = {data["dataValue"]["imuDataGyroAccelY"]}')
-            print(f'Gyro-Acceleration-Z = {data["dataValue"]["imuDataGyroAccelZ"]}')
-            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[beetleId]}')
-            print(f'Is packet corrupted  = {data["isPacketCorrupted"]}')
+            print(f'Beetle-Id = {TEST_IMU}')
+            print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_IMU]}')
+            print(f'Packet-Type = {cls.dataReceived[TEST_IMU]["packetType"]}')
+            print(f'sequenceNumber = {cls.dataReceived[TEST_IMU]["sequenceNumber"]}')
+            print(f'Linear-Acceleration-X = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataLinearAccelX"]}')
+            print(f'Linear-Acceleration-Y = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataLinearAccelY"]}')
+            print(f'Linear-Acceleration-Z = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataLinearAccelZ"]}')
+            print(f'Gyro-Acceleration-Y = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataGyroAccelX"]}')
+            print(f'Gyro-Acceleration-Z = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataGyroAccelY"]}')
+            print(f'Gyro-Acceleration-Z = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataGyroAccelZ"]}')
+            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_IMU]}')
+            print(f'Is packet corrupted  = {cls.dataReceived[TEST_IMU]["isPacketCorrupted"]}')
+        else:
+            print('could not print data')
+
 '''
 BufferManager DOCUMENTATION
 '''
@@ -369,8 +377,8 @@ class BluetoothInterfaceHandler(DefaultDelegate):
         return  packetData[19] == checksum
 
     def handleNotification(self, cHandle, data):
-        system('clear')
-        print('\r')
+        #system('clear')
+        #print('\r')
         try:
             self.receivingBuffer += data 
             if len(self.receivingBuffer) == 1: 
@@ -406,35 +414,24 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                     packetType = struct.unpack('b', packetData[1:2])[0]
                     #logging.info(f'packetType = {packetType}')
                     if chr(packetType) == GUN:
-                        print('##########RECEIVED-GUN-DATA###############')
                         gunData = struct.unpack('B', packetData[2:3])[0]
                         data['beetleId'] = self.beetleId
                         data['sequenceNumber'] = sequenceNumber
                         data['packetType'] = chr(packetType)
                         data['dataValue'] = gunData
                         data['isPacketCorrupted'] = not isPacketCorrect
-                        StatisticsManager.display_statistics(self.beetleId, data)
-                        #logging.info(f'packet-type = {packetType}')
-                        #logging.info(f'sequence-number = {sequenceNumber}')
-                        #logging.info(f'value received from gun = {gunData}')
-                        #logging.info(f'is the packet corrupted = {not isPacketCorrect}')
+                        StatisticsManager.set_beetle_statistics(self.beetleId, data)
                   
                     if chr(packetType) == VEST:
-                        print('##########RECEIVED-VEST-DATA###############')
                         vestData = struct.unpack('B', packetData[2:3])[0]     
                         data['beetleId'] = self.beetleId
                         data['sequenceNumber'] = sequenceNumber
                         data['packetType'] = chr(packetType)
                         data['dataValue'] = vestData
                         data['isPacketCorrupted'] = not isPacketCorrect
-                        StatisticsManager.display_statistics(self.beetleId, data)
-                        #logging.info(f'packet-type = {chr(packetType)}')
-                        #logging.info(f'sequence-number = {sequenceNumber}')
-                        #logging.info(f'value received from vest = {vestData}')
-                        #logging.info(f'is the packet corrupted = {not isPacketCorrect}')
+                        StatisticsManager.set_beetle_statistics(self.beetleId, data)
 
-                    if chr(packetType) == IMU: 
-                        print('##########RECEIVED-IMU-DATA###############')
+                    if chr(packetType) == IMU:
                         imuDataLinearAccelX = struct.unpack('B', packetData[2:3])[0]
                         imuDataLinearAccelY = struct.unpack('B', packetData[3:4])[0]
                         imuDataLinearAccelZ = struct.unpack('B', packetData[4:5])[0]
@@ -455,18 +452,8 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         data['packetType'] = chr(packetType)
                         data['dataValue'] = imuData
                         data['isPacketCorrupted'] = not isPacketCorrect
-                        StatisticsManager.display_statistics(self.beetleId, data)
+                        StatisticsManager.set_beetle_statistics(self.beetleId, data)
 
-                        #logging.info(f'packet-type = {packetType}')
-                        #logging.info(f'sequence-number = {sequenceNumber}')
-                        #logging.info(f'Linear-Acceleration-X = {imuDataLinearAccelX}')
-                        #logging.info(f'Linear-Acceleration-Y = {imuDataLinearAccelY}')
-                        #logging.info(f'Linear-Acceleration-Z = {imuDataLinearAccelZ}')
-                        #logging.info(f'Gyro-Acceleration-Y = {imuDataGyroAccelX}')
-                        #logging.info(f'Gyro-Acceleration-Z = {imuDataGyroAccelY}')
-                        #logging.info(f'Gyro-Acceleration-Z = {imuDataGyroAccelZ}')
-                        #logging.info(f'is the packet corrupted = {not isPacketCorrect}')
-                    
                     StatusManager.set_data_ack_status(self.beetleId)
 
                 else:
@@ -478,7 +465,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                 #if data is not coming out to be correct comment out these two lines 
                 #self.receivingBuffer = b''
                 print('Packet is fragmented')
-                cls.increment_num_of_fragmented_packet(self.beetleId)
+                cls.increment_num_of_fragmented_packets(self.beetleId)
                 pass 
         except Exception as e: 
             logging.info(f'handleNotfications: Something Went wrong. please see the exception message below:\n {e}')
@@ -546,13 +533,13 @@ class BlunoDevice:
                         StatisticsManager.clear_data_rate(self.beetleId)
                         StatisticsManager.set_start_time(self.beetleId)
                     isHandshakeCompleted = self.handshake_mechanism(isHandshakeCompleted)
-                    logging.info(isHandshakeCompleted)
+                    #logging.info(isHandshakeCompleted)
                 else:
                     #regular data transfer
+                    StatisticsManager.display_statistics()
                     #logging.info(f'{self.beetleId} - regular data transfer')
-
                     #logging.info('Before waiting for notification')
-                    self.peripheral.waitForNotifications(4.0)
+                    self.peripheral.waitForNotifications(1.0)
                     #logging.info('After waiting for notification')
 
                     if StatusManager.get_data_ack_status(self.beetleId):
@@ -596,17 +583,17 @@ if __name__ == '__main__':
     #Player-1
     beetle0 = BlunoDevice(PLAYER_1_GUN, MAC_ADDRESSES[PLAYER_1_GUN])
     beetle1 = BlunoDevice(PLAYER_1_VEST, MAC_ADDRESSES[PLAYER_1_VEST])
-    beetle2 = BlunoDevice(PLAYER_1_MPU, MAC_ADDRESSES[PLAYER_1_MPU])
+    beetle2 = BlunoDevice(PLAYER_1_IMU, MAC_ADDRESSES[PLAYER_1_IMU])
     
     #Player-2
     beetle3 = BlunoDevice(PLAYER_2_GUN, MAC_ADDRESSES[PLAYER_2_GUN])
     beetle4 = BlunoDevice(PLAYER_2_VEST, MAC_ADDRESSES[PLAYER_2_VEST])
-    beetle5 = BlunoDevice(PLAYER_2_MPU, MAC_ADDRESSES[PLAYER_2_MPU])
+    beetle5 = BlunoDevice(PLAYER_2_IMU, MAC_ADDRESSES[PLAYER_2_IMU])
     
     #Testers
     beetle6 = BlunoDevice(TEST_GUN, MAC_ADDRESSES[TEST_GUN])
     beetle7 = BlunoDevice(TEST_VEST, MAC_ADDRESSES[TEST_VEST])
-    beetle8 = BlunoDevice(TEST_MPU, MAC_ADDRESSES[TEST_MPU])
+    beetle8 = BlunoDevice(TEST_IMU, MAC_ADDRESSES[TEST_IMU])
     
     #Instantiation of Threads 
     logging.info('Instantiation of threads')
