@@ -253,15 +253,15 @@ class StatusManager:
     #METHODS ASSOCIATED WITH CONNECTION BUFFER
     @classmethod
     def set_connection_status(cls, beetle_id):
-        cls.syncStatusLock.acquire()
+        cls.connectionStatusLock.acquire()
         cls.connectionStatusFlags[beetle_id] = True
-        cls.syncStatusLock.release()
+        cls.connectionStatusLock.release()
 
     @classmethod
     def clear_connection_status(cls, beetle_id):
-        cls.syncStatusLock.acquire()
+        cls.connectionStatusLock.acquire()
         cls.connectionStatusFlags[beetle_id] = False
-        cls.syncStatusLock.release()
+        cls.connectionStatusLock.release()
 
     @classmethod
     def get_connection_status(cls, beetle_id):
