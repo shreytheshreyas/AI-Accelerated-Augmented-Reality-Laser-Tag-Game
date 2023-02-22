@@ -12,7 +12,7 @@ float AccErrorX, AccErrorY, GyroErrorX, GyroErrorY, GyroErrorZ;
 float elapsedTime, currentTime, previousTime;
 int c = 0;
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(19200);
   Wire.begin();                      // Initialize comunication
   Wire.beginTransmission(MPU);       // Start communication with MPU6050 // MPU=0x68
   Wire.write(0x6B);                  // Talk to the register 6B
@@ -72,10 +72,13 @@ void loop() {
   pitch = 0.96 * gyroAngleY + 0.04 * accAngleY;
   
   // Print the values on the serial monitor
+  Serial.print("Roll: ");
   Serial.print(roll);
   Serial.print("/");
+  Serial.print("Pitch: ");
   Serial.print(pitch);
   Serial.print("/");
+  Serial.print("Yaw: ")
   Serial.println(yaw);
 }
 void calculate_IMU_error() {
