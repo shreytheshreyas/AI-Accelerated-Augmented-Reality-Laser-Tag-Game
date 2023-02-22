@@ -83,9 +83,9 @@ class StatisticsManager:
             pass
     @classmethod
     def increment_num_fragmented_packets(cls, beetleId):
-        cls.fragementedPacketCounterLock.acquire()
+        #cls.fragementedPacketCounterLock.acquire()
         cls.fragmentedPacketCounter[beetleId] += 1
-        cls.fragmentedPacketCounterLock.release()
+        #cls.fragmentedPacketCounterLock.release()
     
     @classmethod
     def set_beetle_statistics(cls, beetleId, data):
@@ -457,7 +457,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                 #if data is not coming out to be correct comment out these two lines 
                 #self.receivingBuffer = b''
                 print('Packet is fragmented')
-                cls.increment_num_of_fragmented_packets(self.beetleId)
+                StatisticsManager.increment_num_fragmented_packets(self.beetleId)
                 pass 
         except Exception as e: 
             logging.info(f'handleNotfications: Something Went wrong. please see the exception message below:\n {e}')
