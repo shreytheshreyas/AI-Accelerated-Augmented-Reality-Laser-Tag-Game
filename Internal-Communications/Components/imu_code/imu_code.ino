@@ -133,7 +133,7 @@
 #define PACKET_SIZE 20
 #define SENSOR_DATA 20
 #define DATA_RATE 115200
-#define TIMEOUT 2000
+#define TIMEOUT 50
 //Defining packet types
 #define SYNC 'S'
 #define ACK 'A'
