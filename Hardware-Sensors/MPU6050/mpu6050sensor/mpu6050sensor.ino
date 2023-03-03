@@ -3,6 +3,8 @@
    by Dejan, https://howtomechatronics.com
 */
 #include <Wire.h>
+#define LABEL "shield"
+
 const int MPU = 0x68; // MPU6050 I2C address
 float AccX, AccY, AccZ;
 float GyroX, GyroY, GyroZ;
@@ -11,6 +13,7 @@ float roll, pitch, yaw;
 float AccErrorX, AccErrorY, GyroErrorX, GyroErrorY, GyroErrorZ;
 float elapsedTime, currentTime, previousTime;
 int c = 0;
+
 void setup() {
   Serial.begin(19200);
   Wire.begin();                      // Initialize comunication
@@ -34,6 +37,26 @@ void setup() {
   // Call this function if you need to get the IMU error values for your module
   calculate_IMU_error();
   delay(20);
+  Serial.print("AccX: ");
+  Serial.print(",");
+  Serial.print("AccY: ");
+  Serial.print(",");
+  Serial.print("AccZ: ");
+  Serial.print(",");
+  Serial.print("GyroX: ");
+  Serial.print(",");
+  Serial.print("GyroY: ");
+  Serial.print(",");
+  Serial.print("GyroZ: ");
+  Serial.print(",");
+  Serial.print("Roll: ");
+  Serial.print(",");
+  Serial.print("Pitch: ");
+  Serial.print(",");
+  Serial.print("Yaw: ");
+  Serial.print(",");
+  Serial.print("Action: ");
+  Serial.println(",");
 }
 void loop() {
   // === Read acceleromter data === //
@@ -72,14 +95,34 @@ void loop() {
   pitch = 0.96 * gyroAngleY + 0.04 * accAngleY;
   
   // Print the values on the serial monitor
-  Serial.print("Roll: ");
+
+//  Serial.print("AccX: ");
+  Serial.print(AccX);
+  Serial.print(",");
+//  Serial.print("AccY: ");
+  Serial.print(AccY);
+  Serial.print(",");
+//  Serial.print("AccZ: ");
+  Serial.print(AccZ);
+//  Serial.print("GyroX: ");
+  Serial.print(GyroX);
+  Serial.print(",");
+//  Serial.print("GyroY: ");
+  Serial.print(GyroY);
+  Serial.print(",");
+//  Serial.print("GyroZ: ");
+  Serial.print(GyroZ);
+//  Serial.print("Roll: ");
   Serial.print(roll);
-  Serial.print("/");
-  Serial.print("Pitch: ");
+  Serial.print(",");
+//  Serial.print("Pitch: ");
   Serial.print(pitch);
-  Serial.print("/");
-  Serial.print("Yaw: ")
-  Serial.println(yaw);
+  Serial.print(",");
+//  Serial.print("Yaw: ");
+  Serial.print(yaw);
+  Serial.print(",");
+  Serial.print(LABEL);
+  Serial.println(",");
 }
 void calculate_IMU_error() {
   // We can call this funtion in the setup section to calculate the accelerometer and gyro data error. From here we will get the error values used in the above equations printed on the Serial Monitor.
