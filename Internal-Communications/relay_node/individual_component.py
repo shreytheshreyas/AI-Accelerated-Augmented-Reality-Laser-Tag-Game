@@ -7,7 +7,7 @@ import threading
 import logging
 import time 
 import struct
-
+import csv
 
 #Respond Message Buffer size
 NUM_OF_BEETLES =  9 #Need to update to 6 to accomodate two players
@@ -41,7 +41,7 @@ MAC_ADDRESSES = {
         2: 'D0:39:72:BF:C8:D8',
         3: 'a',
         4: 'a',
-        5: 'a',
+        5: 'D0:39:72:BF:C3:D6',
         6: 'D0:39:72:BF:C8:89',
         7: 'D0:39:72:BF:C8:D7',
         8: '6C:79:B8:D3:6A:A3'
@@ -435,6 +435,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
 
                     if chr(packetType) == IMU:
                         if self.imuDataFlagCounter == 0:
+                            self.imuDataFeatureVector['timestamp'] = (datetime.now()).timestamp() 
                             self.imuDataFeatureVector['imuDataLinearAccelX'] = struct.unpack('f', packetData[2:6])[0]
                             self.imuDataFeatureVector['imuDataLinearAccelY'] = struct.unpack('f', packetData[6:10])[0]
                             self.imuDataFeatureVector['imuDataLinearAccelZ'] = struct.unpack('f', packetData[10:14])[0]
@@ -448,7 +449,9 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                             self.imuDataFeatureVector['roll'] = struct.unpack('f', packetData[2:6])[0]
                             self.imuDataFeatureVector['pitch'] = struct.unpack('f', packetData[2:6])[0]
                             self.imuDataFeatureVector['yaw'] = struct.unpack('f', packetData[2:6])[0]
-                     
+                            #self.imuDataFeatureVector['label'] = 'Shield'
+                            self.imuDataFeatureVector['label'] = 'Reload'
+
                         #imuDataLinearAccelX = struct.unpack('B', packetData[2:3])[0]
                         #imuDataLinearAccelY = struct.unpack('B', packetData[3:4])[0]
                         #imuDataLinearAccelZ = struct.unpack('B', packetData[4:5])[0]
@@ -481,6 +484,25 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                     if self.imuDataFlagCounter == 3:
                         self.imuDataFlagCounter = 0
                         print(self.imuDataFeatureVector)
+                        
+                        #myFile = open('shield_data.csv', 'a')
+                        #writer = csv.DictWriter(myFile, fieldnames=list(self.imuDataFeatureVector.keys()))
+                        #writer.writerow(self.imuDataFeatureVector)
+                        #myFile.close()
+                        
+                        
+                        #with open('shield_data.csv', 'a') as file:
+                        #    writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
+                        #        'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
+                        #        'roll', 'pitch', 'yaw', 'label'])
+                        #    writer.writerow(self.imuDataFeatureVector)
+                        
+                        with open('reload_data.csv', 'a') as file:
+                            writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
+                                'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
+                                'roll', 'pitch', 'yaw', 'label'])
+                            writer.writerow(self.imuDataFeatureVector)
+                        
                         self.imuDataFeatureVector = {}
 
                     StatusManager.set_data_ack_status(self.beetleId)
@@ -565,7 +587,7 @@ class BlunoDevice:
                 else:
                     #regular data transfer
                     #StatisticsManager.display_statistics()
-                    self.peripheral.waitForNotifications(1.0)
+                    self.peripheral.waitForNotifications(0.1)
 
                     if StatusManager.get_data_ack_status(self.beetleId):
                         self.transmit_packet(DATA_ACK)
@@ -618,10 +640,10 @@ if __name__ == '__main__':
     logging.info('Instantiation of threads')
     #beetleThread0 = threading.Thread(target=beetle0.transmission_protocol, args=())
     #beetleThread1 = threading.Thread(target=beetle1.transmission_protocol, args=()) 
-    beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
+    #beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
     #beetleThread3 = threading.Thread(target=beetle3.establish_connection, args=())
     #beetleThread4 = threading.Thread(target=beetle4.establish_connection, args=())
-    #beetleThread5 = threading.Thread(target=beetle5.establish_connection, args=())
+    beetleThread5 = threading.Thread(target=beetle5.transmission_protocol, args=())
     #beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
     #beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=())
     #beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
@@ -629,10 +651,10 @@ if __name__ == '__main__':
     #Starting beetle Threads
     #beetleThread0.start()
     #beetleThread1.start()
-    beetleThread2.start()
+    #beetleThread2.start()
     #beetleThread3.start()
     #beetleThread4.start()
-    #beetleThread5.start()
+    beetleThread5.start()
     #beetleThread6.start()
     #beetleThread7.start()
     #beetleThread8.start()
@@ -640,10 +662,10 @@ if __name__ == '__main__':
     #Terminating beetle Threads
     #beetleThread0.join()
     #beetleThread1.join()
-    beetleThread2.join()
+    #beetleThread2.join()
     #beetleThread3.join()
     #beetleThread4.join()
-    #beetleThread5.join()
+    beetleThread5.join()
     #beetleThread6.join()
     #beetleThread7.join()
     #beetleThread8.join()
