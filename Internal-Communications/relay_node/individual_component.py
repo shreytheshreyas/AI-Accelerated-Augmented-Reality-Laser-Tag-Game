@@ -7,7 +7,7 @@ import threading
 import logging
 import time 
 import struct
-
+import csv
 
 #Respond Message Buffer size
 NUM_OF_BEETLES =  9 #Need to update to 6 to accomodate two players
@@ -41,7 +41,7 @@ MAC_ADDRESSES = {
         2: 'D0:39:72:BF:C8:D8',
         3: 'a',
         4: 'a',
-        5: 'a',
+        5: 'D0:39:72:BF:C3:D6',
         6: 'D0:39:72:BF:C8:89',
         7: 'D0:39:72:BF:C8:D7',
         8: '6C:79:B8:D3:6A:A3'
@@ -83,9 +83,9 @@ class StatisticsManager:
             pass
     @classmethod
     def increment_num_fragmented_packets(cls, beetleId):
-        cls.fragementedPacketCounterLock.acquire()
+        #cls.fragementedPacketCounterLock.acquire()
         cls.fragmentedPacketCounter[beetleId] += 1
-        cls.fragmentedPacketCounterLock.release()
+        #cls.fragmentedPacketCounterLock.release()
     
     @classmethod
     def set_beetle_statistics(cls, beetleId, data):
@@ -126,20 +126,23 @@ class StatisticsManager:
         else:
             print('################ NO-VEST-DATA-AVAILABLE ######################\n')
     
-        if cls.dataReceived[TEST_IMU] is not None:
+        if cls.dataReceived[PLAYER_2_IMU] is not None:
             print(f'IMU-DATA #########################################################################################################################################################################')
-            print(f'Beetle-Id = {TEST_IMU}') 
-            print(f'Connection-Status = {connectionStatus[StatusManager.get_connection_status(TEST_IMU)]}')
-            print(f'Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(TEST_IMU)]}')
-            print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_IMU]}')
-            print(f'sequenceNumber = {cls.dataReceived[TEST_IMU]["sequenceNumber"]}')
-            print(f'Linear-Acceleration-X = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataLinearAccelX"]}')
-            print(f'Linear-Acceleration-Y = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataLinearAccelY"]}')
-            print(f'Linear-Acceleration-Z = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataLinearAccelZ"]}')
-            print(f'Gyro-Acceleration-Y = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataGyroAccelX"]}')
-            print(f'Gyro-Acceleration-Z = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataGyroAccelY"]}')
-            print(f'Gyro-Acceleration-Z = {cls.dataReceived[TEST_IMU]["dataValue"]["imuDataGyroAccelZ"]}')
-            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_IMU]}\n')
+            print(f'Beetle-Id = {PLAYER_2_IMU}') 
+            print(f'Connection-Status = {connectionStatus[StatusManager.get_connection_status(PLAYER_2_IMU)]}')
+            print(f'Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(PLAYER_2_IMU)]}')
+            print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[PLAYER_2_IMU]}')
+            print(f'sequenceNumber = {cls.dataReceived[PLAYER_2_IMU]["sequenceNumber"]}')
+            print(f'Linear-Acceleration-X = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataLinearAccelX"]}')
+            print(f'Linear-Acceleration-Y = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataLinearAccelY"]}')
+            print(f'Linear-Acceleration-Z = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataLinearAccelZ"]}')
+            print(f'Gyro-Acceleration-Y = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataGyroAccelX"]}')
+            print(f'Gyro-Acceleration-Z = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataGyroAccelY"]}')
+            print(f'Gyro-Acceleration-Z = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataGyroAccelZ"]}')
+            print(f'Roll = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataRoll"]}')
+            print(f'Pitch = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataPitch"]}')
+            print(f'Yaw = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataYaw"]}')
+            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[PLAYER_2_IMU]}\n')
         else:
             print('################ NO-IMU-DATA-AVAILABLE ######################\n')
 
@@ -374,6 +377,13 @@ class BluetoothInterfaceHandler(DefaultDelegate):
         DefaultDelegate.__init__(self)
         self.beetleId = beetleId
         self.receivingBuffer = b'' 
+        self.imuDataFeatureVector = {}
+        self.imuDataFlagCounter = 0
+        self.imuDataFlags = {
+                'linear-accel-vector': False,
+                'gyro-accel-vector': False,
+                'rotational-force-vector':False
+                }
 
     def verify_checksum(self, packetData):
         checksum = 0        
@@ -424,27 +434,76 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         StatisticsManager.set_beetle_statistics(self.beetleId, data)
 
                     if chr(packetType) == IMU:
-                        imuDataLinearAccelX = struct.unpack('B', packetData[2:3])[0]
-                        imuDataLinearAccelY = struct.unpack('B', packetData[3:4])[0]
-                        imuDataLinearAccelZ = struct.unpack('B', packetData[4:5])[0]
-                        imuDataGyroAccelX = struct.unpack('B', packetData[5:6])[0]
-                        imuDataGyroAccelY = struct.unpack('B', packetData[6:7])[0]
-                        imuDataGyroAccelZ = struct.unpack('B', packetData[7:8])[0] 
+                        if self.imuDataFlagCounter == 0:
+                            self.imuDataFeatureVector['timestamp'] = (datetime.now()).timestamp() 
+                            self.imuDataFeatureVector['imuDataLinearAccelX'] = struct.unpack('f', packetData[2:6])[0]
+                            self.imuDataFeatureVector['imuDataLinearAccelY'] = struct.unpack('f', packetData[6:10])[0]
+                            self.imuDataFeatureVector['imuDataLinearAccelZ'] = struct.unpack('f', packetData[10:14])[0]
+
+                        if self.imuDataFlagCounter == 1:
+                            self.imuDataFeatureVector['imuDataGyroAccelX'] = struct.unpack('f', packetData[2:6])[0]
+                            self.imuDataFeatureVector['imuDataGyroAccelY'] = struct.unpack('f', packetData[2:6])[0]
+                            self.imuDataFeatureVector['imuDataGyroAccelZ'] = struct.unpack('f', packetData[2:6])[0]
                         
-                        imuData = {}
-                        imuData['imuDataLinearAccelX'] = imuDataLinearAccelX
-                        imuData['imuDataLinearAccelY'] = imuDataLinearAccelY
-                        imuData['imuDataLinearAccelZ'] = imuDataLinearAccelZ
-                        imuData['imuDataGyroAccelX'] = imuDataGyroAccelX 
-                        imuData['imuDataGyroAccelY'] = imuDataGyroAccelY
-                        imuData['imuDataGyroAccelZ'] = imuDataGyroAccelZ 
+                        if self.imuDataFlagCounter == 2:
+                            self.imuDataFeatureVector['roll'] = struct.unpack('f', packetData[2:6])[0]
+                            self.imuDataFeatureVector['pitch'] = struct.unpack('f', packetData[2:6])[0]
+                            self.imuDataFeatureVector['yaw'] = struct.unpack('f', packetData[2:6])[0]
+                            #self.imuDataFeatureVector['label'] = 'Shield'
+                            self.imuDataFeatureVector['label'] = 'Reload'
+
+                        #imuDataLinearAccelX = struct.unpack('B', packetData[2:3])[0]
+                        #imuDataLinearAccelY = struct.unpack('B', packetData[3:4])[0]
+                        #imuDataLinearAccelZ = struct.unpack('B', packetData[4:5])[0]
+                        #imuDataGyroAccelX = struct.unpack('B', packetData[5:6])[0]
+                        #imuDataGyroAccelY = struct.unpack('B', packetData[6:7])[0]
+                        #imuDataGyroAccelZ = struct.unpack('B', packetData[7:8])[0] 
+                        #imuDataRoll = struct.unpack('B', packetData[8:9])[0] 
+                        #imuDataPitch = struct.unpack('B', packetData[9:10])[0] 
+                        #imuDataYaw = struct.unpack('B', packetData[10:11])[0] 
+                        #imuData = {}
+
+                        #imuData['imuDataLinearAccelX'] = imuDataLinearAccelX
+                        #imuData['imuDataLinearAccelY'] = imuDataLinearAccelY
+                        #imuData['imuDataLinearAccelZ'] = imuDataLinearAccelZ
+                        #imuData['imuDataGyroAccelX'] = imuDataGyroAccelX 
+                        #imuData['imuDataGyroAccelY'] = imuDataGyroAccelY
+                        #imuData['imuDataGyroAccelZ'] = imuDataGyroAccelZ 
+                        #imuData['imuDataRoll'] = imuDataRoll
+                        #imuData['imuDataPitch'] = imuDataPitch
+                        #imuData['imuDataYaw'] = imuDataYaw 
                         
                         data['beetleId'] = self.beetleId
                         data['sequenceNumber'] = sequenceNumber
                         data['packetType'] = chr(packetType)
-                        data['dataValue'] = imuData
+                        data['dataValue'] = self.imuDataFeatureVector
                         data['isPacketCorrupted'] = not isPacketCorrect
-                        StatisticsManager.set_beetle_statistics(self.beetleId, data)
+                        #StatisticsManager.set_beetle_statistics(self.beetleId, data)
+                        self.imuDataFlagCounter += 1
+                    
+                    if self.imuDataFlagCounter == 3:
+                        self.imuDataFlagCounter = 0
+                        print(self.imuDataFeatureVector)
+                        
+                        #myFile = open('shield_data.csv', 'a')
+                        #writer = csv.DictWriter(myFile, fieldnames=list(self.imuDataFeatureVector.keys()))
+                        #writer.writerow(self.imuDataFeatureVector)
+                        #myFile.close()
+                        
+                        
+                        #with open('shield_data.csv', 'a') as file:
+                        #    writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
+                        #        'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
+                        #        'roll', 'pitch', 'yaw', 'label'])
+                        #    writer.writerow(self.imuDataFeatureVector)
+                        
+                        with open('reload_data.csv', 'a') as file:
+                            writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
+                                'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
+                                'roll', 'pitch', 'yaw', 'label'])
+                            writer.writerow(self.imuDataFeatureVector)
+                        
+                        self.imuDataFeatureVector = {}
 
                     StatusManager.set_data_ack_status(self.beetleId)
 
@@ -457,7 +516,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                 #if data is not coming out to be correct comment out these two lines 
                 #self.receivingBuffer = b''
                 print('Packet is fragmented')
-                cls.increment_num_of_fragmented_packets(self.beetleId)
+                StatisticsManager.increment_num_fragmented_packets(self.beetleId)
                 pass 
         except Exception as e: 
             logging.info(f'handleNotfications: Something Went wrong. please see the exception message below:\n {e}')
@@ -527,8 +586,8 @@ class BlunoDevice:
                     isHandshakeCompleted = self.handshake_mechanism(isHandshakeCompleted)
                 else:
                     #regular data transfer
-                    StatisticsManager.display_statistics()
-                    self.peripheral.waitForNotifications(1.0)
+                    #StatisticsManager.display_statistics()
+                    self.peripheral.waitForNotifications(0.1)
 
                     if StatusManager.get_data_ack_status(self.beetleId):
                         self.transmit_packet(DATA_ACK)
@@ -581,13 +640,13 @@ if __name__ == '__main__':
     logging.info('Instantiation of threads')
     #beetleThread0 = threading.Thread(target=beetle0.transmission_protocol, args=())
     #beetleThread1 = threading.Thread(target=beetle1.transmission_protocol, args=()) 
-    #beetleThread2 = threading.Thread(target=beetle2.transmission_, args=())
+    #beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
     #beetleThread3 = threading.Thread(target=beetle3.establish_connection, args=())
     #beetleThread4 = threading.Thread(target=beetle4.establish_connection, args=())
-    #beetleThread5 = threading.Thread(target=beetle5.establish_connection, args=())
-    beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
-    beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=())
-    beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
+    beetleThread5 = threading.Thread(target=beetle5.transmission_protocol, args=())
+    #beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
+    #beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=())
+    #beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
     
     #Starting beetle Threads
     #beetleThread0.start()
@@ -595,10 +654,10 @@ if __name__ == '__main__':
     #beetleThread2.start()
     #beetleThread3.start()
     #beetleThread4.start()
-    #beetleThread5.start()
-    beetleThread6.start()
-    beetleThread7.start()
-    beetleThread8.start()
+    beetleThread5.start()
+    #beetleThread6.start()
+    #beetleThread7.start()
+    #beetleThread8.start()
 
     #Terminating beetle Threads
     #beetleThread0.join()
@@ -606,8 +665,8 @@ if __name__ == '__main__':
     #beetleThread2.join()
     #beetleThread3.join()
     #beetleThread4.join()
-    #beetleThread5.join()
-    beetleThread6.join()
-    beetleThread7.join()
-    beetleThread8.join()
+    beetleThread5.join()
+    #beetleThread6.join()
+    #beetleThread7.join()
+    #beetleThread8.join()
 
