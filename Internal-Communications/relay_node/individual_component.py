@@ -497,12 +497,18 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         #        'roll', 'pitch', 'yaw', 'label'])
                         #    writer.writerow(self.imuDataFeatureVector)
                         
-                        with open('reload_data.csv', 'a') as file:
+                        #with open('reload_data.csv', 'a') as file:
+                        #    writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
+                        #        'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
+                        #        'roll', 'pitch', 'yaw', 'label'])
+                        #    writer.writerow(self.imuDataFeatureVector)
+                        
+                        with open('grenade.csv', 'a') as file:
                             writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
                                 'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
                                 'roll', 'pitch', 'yaw', 'label'])
                             writer.writerow(self.imuDataFeatureVector)
-                        
+
                         self.imuDataFeatureVector = {}
 
                     StatusManager.set_data_ack_status(self.beetleId)
@@ -640,7 +646,7 @@ if __name__ == '__main__':
     logging.info('Instantiation of threads')
     #beetleThread0 = threading.Thread(target=beetle0.transmission_protocol, args=())
     #beetleThread1 = threading.Thread(target=beetle1.transmission_protocol, args=()) 
-    #beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
+    beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
     #beetleThread3 = threading.Thread(target=beetle3.establish_connection, args=())
     #beetleThread4 = threading.Thread(target=beetle4.establish_connection, args=())
     beetleThread5 = threading.Thread(target=beetle5.transmission_protocol, args=())
