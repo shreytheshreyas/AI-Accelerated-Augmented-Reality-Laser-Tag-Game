@@ -21,7 +21,7 @@ class LaptopClient:
     def connect(self):
         ssh_tunnel = open_tunnel(
             ("stu.comp.nus.edu", 22),
-            ssh_username="shreyas8",
+            ssh_username="kaijiel",
             remote_bind_address=(self.server_name, 22),
             block_on_close=False,
         )
@@ -41,7 +41,7 @@ class LaptopClient:
 
         self.socket.connect(("localhost", server_tunnel.local_bind_port))
         print("Connected to server on Ultra96")
-        
+
     def close():
         self.socket.close()
 
@@ -102,12 +102,11 @@ class LaptopClient:
         sensor = ""
 
         while not sensor:
-            
             if user_input not in "1234":
                 print("Input invalid, try again")
                 continue
-            
-            #put this in the connection established 
+
+            # put this in the connection established
             sensor = sensors[int(user_input) - 1]
             send_json = '{"player": "p1", "sensor": "' + sensor + '"}'
 
@@ -148,7 +147,7 @@ class LaptopClient:
 if __name__ == "__main__":
     client = LaptopClient("192.168.95.250", 8080)
     client.connect()
-    
+
     try:
         client.run()
     except KeyboardInterrupt:
