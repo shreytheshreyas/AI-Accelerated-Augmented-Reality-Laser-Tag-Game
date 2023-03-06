@@ -166,7 +166,7 @@ class BufferManager:
     
     @classmethod
     def insertDataValue(cls, beetle_id, dataValue):
-        pass
+        relayNodeBuffer.put(dataValue)    
 
     @classmethod 
     def transferDataValue(cls):
@@ -258,7 +258,7 @@ This is primarly used to access the following class level variables
         
         * False -> has not received anything from sensor.
     
-    - Following are the locks associated with this list object:
+    - Following are the locks associated with thislist object:
         * dataNackStatusLock 
 
 '''
@@ -381,7 +381,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                 'gyro-accel-vector': False,
                 'rotational-force-vector':False
                 }
-
+        
     def verify_checksum(self, packetData):
         checksum = 0        
         for idx in range(len(packetData) - 1):
@@ -494,14 +494,14 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         #        'roll', 'pitch', 'yaw', 'label'])
                         #    writer.writerow(self.imuDataFeatureVector)
                         
-                        with open('reload_data.csv', 'a') as file:
-                            writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
-                                'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
-                                'roll', 'pitch', 'yaw', 'label'])
-                            writer.writerow(self.imuDataFeatureVector)
+                       #with open('reload_data.csv', 'a') as file:
+                       #     writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
+                       #         'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
+                       #         'roll', 'pitch', 'yaw', 'label'])
+                       #     writer.writerow(self.imuDataFeatureVector)
                         
                         self.imuDataFeatureVector = {}
-
+                        #BufferManager.relayNodeBuffer.put(self.imuDataFeatureVector)
                     StatusManager.set_data_ack_status(self.beetleId)
 
                 else:
@@ -524,7 +524,7 @@ class BlunoDevice:
         self.macAddress = macAddress
         self.peripheral = None
         self.blutoothInterfaceHandler = None
-        self.laptopClient  = LaptopClient('192.168.95.250','8080')
+        self.laptopClient  = LaptopClient('192.168.95.250',8081)
     
     def transmit_packet(self, data):
         try:
@@ -542,9 +542,9 @@ class BlunoDevice:
             self.bluetoothInterfaceHandler = BluetoothInterfaceHandler(self.beetleId)
             self.peripheral.withDelegate(self.bluetoothInterfaceHandler)
             StatusManager.set_connection_status(self.beetleId)        
-            self.laptopClient.connect()
-            self.laptopClient.send_json(PLAYER_JSON_DATA[self.beetleId])
-            receivedMessage = self.laptopClient.recev_game_state()
+            #self.laptopClient.connect()
+            #self.laptopClient.send_plaintext(PLAYER_JSON_DATA[self.beetleId])
+            #receivedMessage = self.laptopClient.recv_game_state()
             logging.info(f'Connection successfully established between the beetle-{self.beetleId} and relay node.') 
             logging.info(f'Connection successfully established between relay node and ultra-96.')
 
@@ -592,6 +592,7 @@ class BlunoDevice:
                     self.peripheral.waitForNotifications(0.1)
 
                     if StatusManager.get_data_ack_status(self.beetleId):
+                        #self.laptopClient.send_plaintext(BufferManager.relayNodeBuffer.get())
                         self.transmit_packet(DATA_ACK)
                         StatusManager.clear_data_ack_status(self.beetleId)
 
