@@ -1,6 +1,5 @@
 import json
 import time
-from base64 import encode
 
 from GameState import GameState
 from Helper import Actions
@@ -29,7 +28,7 @@ class GameEngine:
         self.game_state.player_2.initialize_from_dict(update["p2"])
 
     def reset_turn(self):
-        print("Resetting")
+        # print("Resetting")
         self.turn_end_time = time.time() + TURN_MAX_TIME
         self.turn_time_left = TURN_MAX_TIME
         self.complete = {"p1": False, "p2": False}
@@ -65,11 +64,11 @@ class GameEngine:
         return "p1" if player == "p2" else "p2"
 
     def is_complete(self):
-        return self.complete["p1"] and self.complete["p2"]
+        return self.complete["p1"] or self.complete["p2"]
 
     def is_turn_over(self):
+        print("turn is over")
         self.turn_time_left = max(self.turn_end_time - time.time(), 0)
-        print(self.turn_time_left)
         return self.turn_time_left <= 0
 
     def run(self):
@@ -88,17 +87,25 @@ class GameEngine:
                 self.signals[player]["action"] = action
             elif action == Actions.hit:
                 self.signals[opp]["opp_hit"] = True
+            # print(self.signals)
 
-            print(self.signals)
             self.check_turn("p1")
             self.check_turn("p2")
 
             if self.is_complete():
                 print("Turn Complete")
-                action_p1 = self.signals["p1"]["action"]
-                opp_hit_p1 = self.signals["p1"]["opp_hit"]
-                action_p2 = self.signals["p2"]["action"]
-                opp_hit_p2 = self.signals["p2"]["opp_hit"]
+                if self.complete["p1"]:
+                    action_p1 = self.signals["p1"]["action"]
+                    opp_hit_p1 = self.signals["p1"]["opp_hit"]
+                else:
+                    action_p1 = Actions.no
+                    opp_hit_p1 = False
+                if self.complete["p2"]:
+                    action_p2 = self.signals["p2"]["action"]
+                    opp_hit_p2 = self.signals["p2"]["opp_hit"]
+                else:
+                    action_p2 = Actions.no
+                    opp_hit_p2 = False
 
                 with self.opp_in_frames.get_lock():
                     opp_blasted_p1 = self.opp_in_frames[0]
@@ -121,8 +128,10 @@ class GameEngine:
                 self.eval_req_queue.put(game_state)
                 self.vis_queue.put(game_state)
 
-                update_json = self.eval_resp_queue.get()
-                update = json.loads(update_json)
+                update = self.eval_resp_queue.get()
                 self.update_players(update)
+                print(
+                    "[Game State Updated] = " + json.dumps(self.game_state.get_dict())
+                )
 
                 self.reset_turn()

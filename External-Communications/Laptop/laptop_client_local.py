@@ -77,19 +77,29 @@ class Client:
         actions = {"gun": "shoot", "vest": "hit", "glove": "glove_movement"}
 
         sensor = ""
+        player = ""
+
+        while not player:
+            user_input = input("Enter player (p1/p2): ")
+
+            if user_input not in ["p1", "p2"]:
+                print("Input invalid, try again")
+                continue
+            player = user_input
 
         while not sensor:
-            user_input = input(PROMPT.strip())
+            user_input = input(PROMPT)
 
             if user_input not in "1234":
                 print("Input invalid, try again")
                 continue
 
             sensor = sensors[int(user_input) - 1]
-            send_json = '{"player": "p1", "sensor": "' + sensor + '"}'
 
-            print("Sending", send_json)
-            self.send_plaintext(send_json)
+        send_json = '{"player": "' + player + '", "sensor": "' + sensor + '"}'
+        print("Sending", send_json)
+
+        self.send_plaintext(send_json)
 
         receivedMsg = self.recv_game_state()
         if not receivedMsg:
@@ -101,10 +111,17 @@ class Client:
             user_input = input("Enter to continue/ q to quit: ")
             if user_input == "q":
                 break
+
             send_json = "shoot"
             if sensor not in actions:
                 break
             action = actions[sensor]
+
+            if sensor == "glove":
+                if user_input not in "012":
+                    print("Wrong user input")
+                    continue
+                action = user_input
 
             print("Sending", action)
             self.send_plaintext(action)
