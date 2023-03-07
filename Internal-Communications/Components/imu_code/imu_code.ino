@@ -6,6 +6,8 @@
 #define SENSOR_DATA 20
 #define DATA_RATE 115200
 #define TIMEOUT 50
+//#define TIMEOUT 1000
+//#define TIMEOUT 5000
 
 //Defining packet types
 #define SYNC 'S'
