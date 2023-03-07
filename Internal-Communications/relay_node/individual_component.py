@@ -50,8 +50,8 @@ PLAYER_JSON_DATA = [
     '{"player": "p2", "sensor": "vest"}',
     '{"player": "p2", "sensor": "glove"}',
     '{"player": "p1", "sensor": "gun"}',
-    '{"player": "p1", "sensor": "vest"}',
-    '{"player": "p1", "sensor": "glove"}',
+    '{"player": "p2", "sensor": "vest"}',
+    '{"player": "p2", "sensor": "glove"}',
 ]
 
 MAC_ADDRESSES = {
@@ -622,7 +622,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                 # if data is not coming out to be correct comment out these two lines
                 # self.receivingBuffer = b''
                 print("Packet is fragmented")
-                cls.increment_num_of_fragmented_packets(self.beetleId)
+                StatisticsManager.increment_num_of_fragmented_packets(self.beetleId)
                 pass
         except Exception as e:
             logging.info(
@@ -636,7 +636,7 @@ class BlunoDevice:
         self.macAddress = macAddress
         self.peripheral = None
         self.blutoothInterfaceHandler = None
-        self.laptopClient = LaptopClient("192.168.95.250", 8081)
+        self.laptopClient = LaptopClient("192.168.95.250", 8080)
 
     def transmit_packet(self, data):
         try:
@@ -655,6 +655,12 @@ class BlunoDevice:
         receivedMessage = self.laptopClient.recv_game_state()
         logging.info(
             f"Connection successfully established between relay node and ultra-96 - {receivedMessage}"
+        )
+
+    def close_connection_to_ultra96(self):
+        self.laptopClient.close()
+        logging.info(
+            f"Closed connection between relay node and ultra-96"
         )
 
     def establish_connection(self):
@@ -751,6 +757,7 @@ class BlunoDevice:
                 StatusManager.clear_ack_status(self.beetleId)
                 StatusManager.clear_data_ack_status(self.beetleId)
                 StatusManager.clear_data_nack_status(self.beetleId)
+                self.close_connection_to_ultra96()
                 pass
 
 
@@ -780,10 +787,10 @@ if __name__ == "__main__":
     # beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
     # beetleThread3 = threading.Thread(target=beetle3.establish_connection, args=())
     # beetleThread4 = threading.Thread(target=beetle4.establish_connection, args=())
-    beetleThread5 = threading.Thread(target=beetle5.transmission_protocol, args=())
-    # beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
-    # beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=())
-    # beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
+    # beetleThread5 = threading.Thread(target=beetle5.transmission_protocol, args=())
+    beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
+    beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=())
+    beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
 
     # Starting beetle Threads
     # beetleThread0.start()
@@ -791,10 +798,10 @@ if __name__ == "__main__":
     # beetleThread2.start()
     # beetleThread3.start()
     # beetleThread4.start()
-    beetleThread5.start()
-    # beetleThread6.start()
-    # beetleThread7.start()
-    # beetleThread8.start()
+    # beetleThread5.start()
+    beetleThread6.start()
+    beetleThread7.start()
+    beetleThread8.start()
 
     # Terminating beetle Threads
     # beetleThread0.join()
@@ -802,7 +809,7 @@ if __name__ == "__main__":
     # beetleThread2.join()
     # beetleThread3.join()
     # beetleThread4.join()
-    beetleThread5.join()
-    # beetleThread6.join()
-    # beetleThread7.join()
-    # beetleThread8.join()
+    # beetleThread5.join()
+    beetleThread6.join()
+    beetleThread7.join()
+    beetleThread8.join()
