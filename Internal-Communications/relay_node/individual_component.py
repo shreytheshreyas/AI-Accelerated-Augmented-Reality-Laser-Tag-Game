@@ -442,15 +442,11 @@ class BluetoothInterfaceHandler(DefaultDelegate):
 
                         if self.imuDataFlagCounter == 1:
                             self.imuDataFeatureVector['imuDataGyroAccelX'] = struct.unpack('f', packetData[2:6])[0]
-                            self.imuDataFeatureVector['imuDataGyroAccelY'] = struct.unpack('f', packetData[2:6])[0]
-                            self.imuDataFeatureVector['imuDataGyroAccelZ'] = struct.unpack('f', packetData[2:6])[0]
-                        
-                        if self.imuDataFlagCounter == 2:
-                            self.imuDataFeatureVector['roll'] = struct.unpack('f', packetData[2:6])[0]
-                            self.imuDataFeatureVector['pitch'] = struct.unpack('f', packetData[2:6])[0]
-                            self.imuDataFeatureVector['yaw'] = struct.unpack('f', packetData[2:6])[0]
+                            self.imuDataFeatureVector['imuDataGyroAccelY'] = struct.unpack('f', packetData[6:10])[0]
+                            self.imuDataFeatureVector['imuDataGyroAccelZ'] = struct.unpack('f', packetData[10:14])[0]
                             #self.imuDataFeatureVector['label'] = 'Shield'
-                            self.imuDataFeatureVector['label'] = 'Reload'
+                            #self.imuDataFeatureVector['label'] = 'Reload' 
+                            self.imuDataFeatureVector['label'] = 'Play/Pause'
 
                         #imuDataLinearAccelX = struct.unpack('B', packetData[2:3])[0]
                         #imuDataLinearAccelY = struct.unpack('B', packetData[3:4])[0]
@@ -473,15 +469,15 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         #imuData['imuDataPitch'] = imuDataPitch
                         #imuData['imuDataYaw'] = imuDataYaw 
                         
-                        data['beetleId'] = self.beetleId
-                        data['sequenceNumber'] = sequenceNumber
-                        data['packetType'] = chr(packetType)
-                        data['dataValue'] = self.imuDataFeatureVector
-                        data['isPacketCorrupted'] = not isPacketCorrect
+                        #data['beetleId'] = self.beetleId
+                        #data['sequenceNumber'] = sequenceNumber
+                        #data['packetType'] = chr(packetType)
+                        #data['dataValue'] = self.imuDataFeatureVector
+                        #data['isPacketCorrupted'] = not isPacketCorrect
                         #StatisticsManager.set_beetle_statistics(self.beetleId, data)
                         self.imuDataFlagCounter += 1
                     
-                    if self.imuDataFlagCounter == 3:
+                    if self.imuDataFlagCounter == 2:
                         self.imuDataFlagCounter = 0
                         print(self.imuDataFeatureVector)
                         
@@ -508,6 +504,14 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                                 'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
                                 'roll', 'pitch', 'yaw', 'label'])
                             writer.writerow(self.imuDataFeatureVector)
+                        
+                        with open('gesture_data_play_music.csv', 'a') as file:
+                            writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
+                                'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
+                                'roll', 'pitch', 'yaw', 'label'])
+                            writer.writerow(self.imuDataFeatureVector)
+
+                        self.imuDataFeatureVector = {}
 
                         self.imuDataFeatureVector = {}
 
@@ -652,27 +656,27 @@ if __name__ == '__main__':
     beetleThread5 = threading.Thread(target=beetle5.transmission_protocol, args=())
     #beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
     #beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=())
-    #beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
+    beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
     
     #Starting beetle Threads
     #beetleThread0.start()
     #beetleThread1.start()
-    #beetleThread2.start()
+    beetleThread2.start()
     #beetleThread3.start()
     #beetleThread4.start()
     beetleThread5.start()
     #beetleThread6.start()
     #beetleThread7.start()
-    #beetleThread8.start()
+    beetleThread8.start()
 
     #Terminating beetle Threads
     #beetleThread0.join()
     #beetleThread1.join()
-    #beetleThread2.join()
+    beetleThread2.join()
     #beetleThread3.join()
     #beetleThread4.join()
     beetleThread5.join()
     #beetleThread6.join()
     #beetleThread7.join()
-    #beetleThread8.join()
+    beetleThread8.join()
 
