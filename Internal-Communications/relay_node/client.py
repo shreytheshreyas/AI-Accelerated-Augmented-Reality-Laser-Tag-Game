@@ -42,11 +42,11 @@ class LaptopClient:
         self.socket.connect(("localhost", server_tunnel.local_bind_port))
         print("Connected to server on Ultra96")
 
-    def close():
+    def close(self):
         self.socket.close()
 
-    def recv_game_state(self):
-        game_state_received = None
+    def recv_msg(self):
+        msg = None
         try:
             # recv length followed by '_' followed by cypher
             data = b""
@@ -75,13 +75,12 @@ class LaptopClient:
                 return None
 
             msg = data.decode("utf8")
-            game_state_received = msg
 
         except ConnectionResetError:
             print("Connection Reset")
             return None
 
-        return game_state_received
+        return msg
 
     def send_plaintext(self, plaintext):
         success = True
@@ -95,13 +94,14 @@ class LaptopClient:
             success = False
         return success
 
-    def run(self):
+    def run_test(self):
         sensors = ["gun", "vest", "glove"]
         actions = {"gun": "shoot", "vest": "hit", "glove": "glove_movement"}
 
         sensor = ""
 
         while not sensor:
+            user_input = input()
             if user_input not in "1234":
                 print("Input invalid, try again")
                 continue
@@ -113,7 +113,7 @@ class LaptopClient:
             print("Sending", send_json)
             self.send_plaintext(send_json)
 
-        receivedMsg = self.recv_game_state()
+        receivedMsg = self.recv_msg()
         if not receivedMsg:
             return
 
@@ -132,7 +132,7 @@ class LaptopClient:
             print("Sending", action)
             self.send_plaintext(action)
 
-            receivedMsg = self.recv_game_state()
+            receivedMsg = self.recv_msg()
             if not receivedMsg:
                 break
 
@@ -149,6 +149,6 @@ if __name__ == "__main__":
     client.connect()
 
     try:
-        client.run()
+        client.run_test()
     except KeyboardInterrupt:
         client.stop()

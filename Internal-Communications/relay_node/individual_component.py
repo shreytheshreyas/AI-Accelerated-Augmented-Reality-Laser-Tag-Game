@@ -479,6 +479,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
     def handleNotification(self, cHandle, data):
         # system('clear')
         # print('\r')
+       
         try:
             self.receivingBuffer += data
             if len(self.receivingBuffer) == 1:
@@ -501,6 +502,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                     packetType = struct.unpack("b", packetData[1:2])[0]
 
                     if chr(packetType) == GUN:
+                        print("Handle Gun Notif")
                         gunData = struct.unpack("B", packetData[2:3])[0]
                         data["beetleId"] = self.beetleId
                         data["sequenceNumber"] = sequenceNumber
@@ -508,6 +510,10 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         data["dataValue"] = gunData
                         data["isPacketCorrupted"] = not isPacketCorrect
                         StatisticsManager.set_beetle_statistics(self.beetleId, data)
+                        print("Sending to Ultra96\n", data)
+                        json_data = json.dumps(data)
+                        self.laptopClient.send_plaintext(json_data)
+                        print("Sent to Ultra96")
 
                     if chr(packetType) == VEST:
                         vestData = struct.unpack("B", packetData[2:3])[0]
@@ -517,6 +523,10 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         data["dataValue"] = vestData
                         data["isPacketCorrupted"] = not isPacketCorrect
                         StatisticsManager.set_beetle_statistics(self.beetleId, data)
+                        print("Sending to Ultra96\n", data)
+                        json_data = json.dumps(data)
+                        self.laptopClient.send_plaintext(json_data)
+                        print("Sent to Ultra96")
 
                     if chr(packetType) == IMU:
                         if self.imuDataFlagCounter == 0:
