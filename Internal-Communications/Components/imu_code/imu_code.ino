@@ -4,8 +4,9 @@
 //Defining important constants
 #define PACKET_SIZE 20
 #define SENSOR_DATA 20
+#define SAMPLE_POINT_ID 14
 #define DATA_RATE 115200
-#define TIMEOUT 50
+#define TIMEOUT 5000
 //#define TIMEOUT 1000
 //#define TIMEOUT 5000
 
@@ -34,11 +35,13 @@ const int MPU = 0x68; // MPU6050 I2C address
 float AccX, AccY, AccZ;
 float GyroX, GyroY, GyroZ;
 float accAngleX, accAngleY, gyroAngleX, gyroAngleY, gyroAngleZ;
-float roll, pitch, yaw;
 float AccErrorX, AccErrorY, GyroErrorX, GyroErrorY, GyroErrorZ;
 float elapsedTime, currentTime, previousTime;
 int c = 0;
 int newDataCounter = 0;
+bool transmitLinearAccelData = true;
+bool transmitGyroAccelData = false;
+uint8_t samplePointNumber = 0;
 
 typedef union floatDataByteFormat{
  byte byteValue[4];
@@ -52,9 +55,6 @@ typedef struct imuData {
   float gyro_accel_x;
   float gyro_accel_y;
   float gyro_accel_z;
-  float roll;
-  float pitch;
-  float yaw;
 };
 
 //Class definition for protocol
@@ -64,6 +64,7 @@ class Protocol {
     int sequenceNumber;
     int previousTime;
     int currentTime;
+    int samplePointId;
     imuData sensorData[SENSOR_DATA];
     imuData sensorDataTemp;
     byte packet[PACKET_SIZE];
@@ -74,7 +75,7 @@ class Protocol {
     void clear_serial_buffer(void);
     void floatToByteConverter(void);
     void get_sensor_data(void);
-    void initialize_imu_data(float,float,float,float,float,float,float,float,float);
+    void initialize_imu_data(float,float,float,float,float,float);
     void initialize_packet_data(int);
     void initialize_packet_accel_data(void);
     void initialize_packet_gyro_data(void);
@@ -96,7 +97,7 @@ Protocol::Protocol() {
   this->currentTime = 0;
   
   for(int idx = 0; idx < SENSOR_DATA; idx++)
-    this->sensorData[idx] = (imuData) {1.0 + idx, 1.0 + idx , 1.0 + idx , 100 + idx , 100 + idx, 100 + idx};//In acutal implementation will change to 0
+    this->sensorData[idx] = (imuData) {0, 0, 0, 0, 0, 0};//In acutal implementation will change to 0
 
   for(int idx = 0; idx < PACKET_SIZE; idx++)
     this->packet[idx] = 0;
@@ -116,42 +117,33 @@ void Protocol::clear_serial_buffer() {
     byte dummy = Serial.read();
 }
 
-void Protocol::get_sensor_data() {
-  return;
-}
 
-void Protocol::initialize_imu_data(float linear_accel_x, float linear_accel_y, float linear_accel_z, float gyro_accel_x, float gyro_accel_y, float gyro_accel_z, float roll, float pitch, float yaw) {
+void Protocol::initialize_imu_data(float linear_accel_x, float linear_accel_y, float linear_accel_z, float gyro_accel_x, float gyro_accel_y, float gyro_accel_z) {
   this->sensorDataTemp.linear_accel_x = linear_accel_x;
   this->sensorDataTemp.linear_accel_y = linear_accel_y;
   this->sensorDataTemp.linear_accel_z = linear_accel_z;
   this->sensorDataTemp.gyro_accel_x = gyro_accel_x;
   this->sensorDataTemp.gyro_accel_y = gyro_accel_y;
   this->sensorDataTemp.gyro_accel_z = gyro_accel_z;
-  this->sensorDataTemp.roll = roll;
-  this->sensorDataTemp.pitch = pitch;
-  this->sensorDataTemp.yaw = yaw;
 
-//  Serial.print(this->sensorDataTemp.linear_accel_x);
-//  Serial.print(",");
-//  Serial.print(this->sensorDataTemp.linear_accel_y);
-//  Serial.print(",");
-//  Serial.print(this->sensorDataTemp.linear_accel_z);
-//  Serial.print(",");
-//  Serial.print(this->sensorDataTemp.gyro_accel_x);
-//  Serial.print(",");
-//  Serial.print(this->sensorDataTemp.gyro_accel_y);
-//  Serial.print(",");
-//  Serial.print(this->sensorDataTemp.gyro_accel_z);
-//  Serial.print(roll);
-//  Serial.print(",");
-//  Serial.print(this->sensorDataTemp.roll );
-//  Serial.print(",");
-//  Serial.print(this->sensorDataTemp.pitch );
-//  Serial.print(",");
-//  Serial.print(this->sensorDataTemp.yaw);
-//  Serial.println(",");
+  Serial.println("Before Conversion to float-byte form");
+  Serial.print(this->sensorDataTemp.linear_accel_x);
+  Serial.print(",");
+  Serial.print(this->sensorDataTemp.linear_accel_y);
+  Serial.print(",");
+  Serial.print(this->sensorDataTemp.linear_accel_z);
+  Serial.print(",");
+  Serial.print(this->sensorDataTemp.gyro_accel_x);
+  Serial.print(",");
+  Serial.print(this->sensorDataTemp.gyro_accel_y);
+  Serial.print(",");
+  Serial.println(this->sensorDataTemp.gyro_accel_z);
+
+  Serial.println("After conversion to float-byte form");
 }
 void Protocol::initialize_packet_data(int newDataCounter) {
+//  union integerDataByteFormat samplePointNumberByteValue;
+//  samplePointNumberByteValue.integerValue = samplePointNumber;
   this->packet[0] = this->sequenceNumber;
   this->packet[1] = IMU_DATA;
 
@@ -161,11 +153,9 @@ void Protocol::initialize_packet_data(int newDataCounter) {
 
     case GYRO_INIT: this->initialize_packet_gyro_data();
                     break;
-
-    case ROT_FORCE_INIT: this->initialize_packet_rotational_force_data();
-                          break;
   }
   
+  this->packet[SAMPLE_POINT_ID] = this->samplePointId;
   this->packet[PACKET_SIZE - 1] = this->calculate_checksum(); 
 }
 
@@ -177,23 +167,23 @@ void Protocol::initialize_packet_accel_data(void) {
   vectorComponentX.floatValue = this->sensorDataTemp.linear_accel_x;
   vectorComponentY.floatValue = this->sensorDataTemp.linear_accel_y;
   vectorComponentZ.floatValue = this->sensorDataTemp.linear_accel_z;
-//  Serial.print("Linear-X = ");
-//  Serial.println(vectorComponentX.floatValue);
-//  Serial.print("Linear-Y = ");
-//  Serial.println(vectorComponentY.floatValue);
-//  Serial.println("Linear-Z = ");
-//  Serial.println(vectorComponentZ.floatValue);
+  Serial.print("Linear-X = ");
+  Serial.println(vectorComponentX.floatValue);
+  Serial.print("Linear-Y = ");
+  Serial.println(vectorComponentY.floatValue);
+  Serial.print("Linear-Z = ");
+  Serial.println(vectorComponentZ.floatValue);
   
-  for (int i = FIRST_FLOAT_VALUE; i < SECOND_FLOAT_VALUE; i++) {
-    this->packet[i] = vectorComponentX.byteValue[i - FIRST_FLOAT_VALUE];
+  for (int i = 2; i < 6; i++) {
+    this->packet[i] = vectorComponentX.byteValue[i - 2];
   }
 
-  for(int i = SECOND_FLOAT_VALUE; i < THIRD_FLOAT_VALUE; i++) {
-    this->packet[i] = vectorComponentY.byteValue[i - SECOND_FLOAT_VALUE];
+  for(int i = 6; i < 10; i++) {
+    this->packet[i] = vectorComponentY.byteValue[i - 6];
   }
 
-  for(int i = THIRD_FLOAT_VALUE; i < VALUES_IDX_TERMINATION; i++) {
-    this->packet[i] = vectorComponentZ.byteValue[i - THIRD_FLOAT_VALUE];
+  for(int i = 10; i < 14; i++) {
+    this->packet[i] = vectorComponentZ.byteValue[i - 10];
   }
 } 
 
@@ -205,58 +195,30 @@ void Protocol::initialize_packet_gyro_data(void) {
   vectorComponentX.floatValue = this->sensorDataTemp.gyro_accel_x;
   vectorComponentY.floatValue = this->sensorDataTemp.gyro_accel_y;
   vectorComponentZ.floatValue = this->sensorDataTemp.gyro_accel_z;
-//  Serial.print("Gyro-X = ");
-//  Serial.println(vectorComponentX.floatValue);
-//  Serial.print("Gyro-Y = ");
-//  Serial.println(vectorComponentY.floatValue);
-//  Serial.println("Gyro-Z = ");
-//  Serial.println(vectorComponentZ.floatValue);
+  Serial.print("Gyro-X = ");
+  Serial.println(vectorComponentX.floatValue);
+  Serial.print("Gyro-Y = ");
+  Serial.println(vectorComponentY.floatValue);
+  Serial.print("Gyro-Z = ");
+  Serial.println(vectorComponentZ.floatValue);
   
-  for (int i = FIRST_FLOAT_VALUE; i < SECOND_FLOAT_VALUE; i++) {
-    this->packet[i] = vectorComponentX.byteValue[i - FIRST_FLOAT_VALUE];
+  for (int i = 2; i < 6; i++) {
+    this->packet[i] = vectorComponentX.byteValue[i - 2];
   }
 
-  for(int i = SECOND_FLOAT_VALUE; i < THIRD_FLOAT_VALUE; i++) {
-    this->packet[i] = vectorComponentY.byteValue[i - SECOND_FLOAT_VALUE];
+  for(int i = 6; i < 10; i++) {
+    this->packet[i] = vectorComponentY.byteValue[i - 6];
   }
 
-  for(int i = THIRD_FLOAT_VALUE; i < VALUES_IDX_TERMINATION; i++) {
-    this->packet[i] = vectorComponentZ.byteValue[i - THIRD_FLOAT_VALUE];
+  for(int i = 10; i < 14; i++) {
+    this->packet[i] = vectorComponentZ.byteValue[i - 10];
   }
 }
 
-void Protocol::initialize_packet_rotational_force_data(void) {
-  union floatDataByteFormat vectorComponentX;
-  union floatDataByteFormat vectorComponentY;
-  union floatDataByteFormat vectorComponentZ;
-  vectorComponentX.floatValue = this->sensorDataTemp.roll;
-  vectorComponentY.floatValue = this->sensorDataTemp.pitch;
-  vectorComponentZ.floatValue = this->sensorDataTemp.yaw;
-  
-//  Serial.print("Rotational-Force-X = ");
-//  Serial.println(vectorComponentX.floatValue);
-//  Serial.print("Rotational-Force-Y = ");
-//  Serial.println(vectorComponentY.floatValue);
-//  Serial.println("Rotational-Force-Z = ");
-//  Serial.println(vectorComponentZ.floatValue);
-  for (int i = FIRST_FLOAT_VALUE; i < SECOND_FLOAT_VALUE; i++) {
-    this->packet[i] = vectorComponentX.byteValue[i - FIRST_FLOAT_VALUE];
-  }
-
-  for(int i = SECOND_FLOAT_VALUE; i < THIRD_FLOAT_VALUE; i++) {
-    this->packet[i] = vectorComponentY.byteValue[i - SECOND_FLOAT_VALUE];
-  }
-
-  for(int i = THIRD_FLOAT_VALUE; i < VALUES_IDX_TERMINATION; i++) {
-    this->packet[i] = vectorComponentZ.byteValue[i - THIRD_FLOAT_VALUE];
-  }
-}
 
 void Protocol::start_communication() {
    currentTime = millis();
 
-//    if (!Serial.available())
-//      return;
       
     byte receivedData = Serial.read();
 
@@ -274,7 +236,8 @@ void Protocol::start_communication() {
 
       case DATA_ACK: 
                 this->sequenceNumber++;
-                this->sensorDataIdx = (this->sensorDataIdx + 1) % 20;
+                if (newDataCounter == 0)
+                  this->samplePointId++;
                 break;
 
       case DATA_NACK:
@@ -297,7 +260,7 @@ void Protocol::start_communication() {
     previousTime = currentTime;
   }
 
-  this->clear_serial_buffer();
+//  this->clear_serial_buffer();
 }
 
 void setup() {
@@ -315,26 +278,6 @@ void setup() {
     // Call this function if you need to get the IMU error values for your module
   calculate_IMU_error();
   delay(20);
-//  Serial.print("AccX: ");
-//  Serial.print(",");
-//  Serial.print("AccY: ");
-//  Serial.print(",");
-//  Serial.print("AccZ: ");
-//  Serial.print(",");
-//  Serial.print("GyroX: ");
-//  Serial.print(",");
-//  Serial.print("GyroY: ");
-//  Serial.print(",");
-//  Serial.print("GyroZ: ");
-//  Serial.print(",");
-//  Serial.print("Roll: ");
-//  Serial.print(",");
-//  Serial.print("Pitch: ");
-//  Serial.print(",");
-//  Serial.print("Yaw: ");
-//  Serial.print(",");
-//  Serial.print("Action: ");
-//  Serial.println(",");
 }
 
 void loop() {
@@ -348,9 +291,7 @@ void loop() {
   AccX = (Wire.read() << 8 | Wire.read()) / 16384.0; // X-axis value
   AccY = (Wire.read() << 8 | Wire.read()) / 16384.0; // Y-axis value
   AccZ = (Wire.read() << 8 | Wire.read()) / 16384.0; // Z-axis value
-  // Calculating Roll and Pitch from the accelerometer data
-  accAngleX = (atan(AccY / sqrt(pow(AccX, 2) + pow(AccZ, 2))) * 180 / PI) - AccErrorX; // AccErrorX ~(0.58) See the calculate_IMU_error()custom function for more details
-  accAngleY = (atan(-1 * AccX / sqrt(pow(AccY, 2) + pow(AccZ, 2))) * 180 / PI) + AccErrorY; // AccErrorY ~(-1.58)
+
   // === Read gyroscope data === //
   previousTime = currentTime;        // Previous time is stored before the actual time read
   currentTime = millis();            // Current time actual time read
@@ -366,21 +307,14 @@ void loop() {
   GyroX = GyroX - GyroErrorX; // GyroErrorX ~(-0.56)
   GyroY = GyroY - GyroErrorY; // GyroErrorY ~(2)
   GyroZ = GyroZ - GyroErrorZ; // GyroErrorZ ~ (-0.8)
-  // Currently the raw values are in degrees per seconds, deg/s, so we need to multiply by sendonds (s) to get the angle in degrees
-  gyroAngleX = gyroAngleX + GyroX * elapsedTime; // deg/s * s = deg
-  gyroAngleY = gyroAngleY + GyroY * elapsedTime;
-  yaw =  yaw + GyroZ * elapsedTime;
-  // Complementary filter - combine acceleromter and gyro angle values
-  roll = 0.96 * gyroAngleX + 0.04 * accAngleX;
-  pitch = 0.96 * gyroAngleY + 0.04 * accAngleY;
 
   if (newDataCounter == 0)
-    communicationProtocol->initialize_imu_data(AccX, AccY, AccZ, GyroX, GyroY, GyroZ, roll, pitch, yaw);
-  
+    communicationProtocol->initialize_imu_data(AccX, AccY, AccZ, GyroX, GyroY, GyroZ);
+    
   communicationProtocol->initialize_packet_data(newDataCounter);
   communicationProtocol->start_communication();
 //  communicationProtocol->clear_serial_buffer();
-  newDataCounter = (newDataCounter + 1) % 3;
+  newDataCounter = (newDataCounter + 1) % 2;
 }
 
 void calculate_IMU_error() {
@@ -423,15 +357,4 @@ void calculate_IMU_error() {
   GyroErrorX = GyroErrorX / 200;
   GyroErrorY = GyroErrorY / 200;
   GyroErrorZ = GyroErrorZ / 200;
-  // Print the error values on the Serial Monitor
-//  Serial.print("AccErrorX: ");
-//  Serial.println(AccErrorX);
-//  Serial.print("AccErrorY: ");
-//  Serial.println(AccErrorY);
-//  Serial.print("GyroErrorX: ");
-//  Serial.println(GyroErrorX);
-//  Serial.print("GyroErrorY: ");
-//  Serial.println(GyroErrorY);
-//  Serial.print("GyroErrorZ: ");
-//  Serial.println(GyroErrorZ);
 }

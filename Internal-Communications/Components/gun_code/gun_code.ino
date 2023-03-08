@@ -16,6 +16,25 @@
 #define RST_ACK 'r'
 #define FIN 'F'
 
+#define DECODE_NEC
+
+const int buttonPin = 2;    // Button at pin D2
+const int IR_SEND_PIN = 3;  // IR transmitter at pin D3
+const int buzzerPin = 5;    //buzzer at pin D5
+int buttonState = 0;
+
+const uint16_t PLAYER_1_ADDRESS = 0x0102;
+const uint16_t PLAYER_2_ADDRESS = 0x0105;
+const uint8_t command = 0x01; //1 for player 1
+uint8_t repeats = 1;
+uint8_t shotCounter = 0;
+unsigned long sensorDelayStartTime = 0;
+
+typedef union integerDataByteFormat{
+ byte byteValue[2];
+ int intValue;  
+};
+
 //Class definition for protocol
 class Protocol {
   private:
@@ -73,10 +92,12 @@ void Protocol::get_sensor_data() {
   return;
 }
 
-void Protocol::initialize_packet_data() {
+void Protocol::initialize_packet_data(int buttonStateData) {
+  union integerDataFormat buttonStateData;
   this->packet[0] = this->sequenceNumber;
-  this->packet[1] = GUN_DATA;
-  this->packet[2] = this->sensorData[sensorDataIdx];
+  this->packet[1] = buttonStateData.byteValue[0];
+  this->packet[2] = buttonStateData.byteValue[1];
+  this->packet[3] = this->sensorData[sensorDataIdx];
   this->packet[PACKET_SIZE - 1] = this->calculate_checksum(); 
 }
 
@@ -129,8 +150,27 @@ void Protocol::start_communication() {
   this->clear_serial_buffer();
 }
 
+void sensorDelay(long interval) {
+ unsigned long currentMillis = millis();
+
+ while(currentMillis - sensorDelayStartTime < interval)
+    currentMillis = millis();
+ 
+}
+
+void outOfAmmoTune() {
+  tone(buzzerPin,NOTE_D1,100);
+  sensorDelayStartTime = millis();
+  sensorDelay(100); //replace with custom delay
+  tone(buzzerPin,NOTE_E1,100);
+}
+
+
 void setup() {
   Serial.begin(DATA_RATE);
+  pinMode(buttonPin, INPUT_PULLUP);
+  pinMode(buzzerPin, OUTPUT);
+  IrSender.begin(IR_SEND_PIN);  //start sending pin
   hasHandshakeStarted = false;
   hasHandshakeEnded = false;
   communicationProtocol = new Protocol();
@@ -138,7 +178,84 @@ void setup() {
 
 void loop() {
 //  Serial.flush();
-  communicationProtocol->initialize_packet_data();
+  buttonState = digitalRead(buttonPin);
+  Serial.println(buttonState);
+
+  if (buttonState == 0) {
+    shotCounter += 1;
+    switch (shotCounter) {
+      case 1:
+      IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+      Serial.println("signal has been sent");
+      Serial.println(buttonState);
+      tone(buzzerPin,NOTE_C6,100);
+      sensorDelayStartTime = millis();
+      sensorDelay(500);
+      break;
+
+      case 2:
+      IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+      Serial.println("signal has been sent");
+      Serial.println(buttonState);
+      tone(buzzerPin,NOTE_D6  ,100);
+      sensorDelayStartTime = millis();
+      sensorDelay(500);
+      break;
+
+      case 3:
+      IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+      Serial.println("signal has been sent");
+      Serial.println(buttonState);
+      tone(buzzerPin,NOTE_E6,100);
+      sensorDelayStartTime = millis();
+      sensorDelay(500);
+      break;
+
+      case 4:
+      IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+      Serial.println("signal has been sent");
+      Serial.println(buttonState);
+      tone(buzzerPin,NOTE_F6,100);
+      sensorDelayStartTime = millis();
+      sensorDelay(500);
+      break;
+
+      case 5:
+      IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+      Serial.println("signal has been sent");
+      Serial.println(buttonState);
+      tone(buzzerPin,NOTE_G6,100);
+      sensorDelayStartTime = millis();
+      sensorDelay(500);
+      break;
+
+      case 6:
+      IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+      Serial.println("signal has been sent");
+      Serial.println(buttonState);
+      tone(buzzerPin,NOTE_A6,100);
+      sensorDelayStartTime = millis();
+      sensorDelay(500);
+      break;
+
+      // case 7:
+      // IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+      // Serial.println("signal has been sent");
+      // Serial.println(buttonState);
+      // tone(buzzerPin,NOTE_B6 ,100);
+      // delay(500);
+      // break;
+
+      default:
+      Serial.println("out of ammo");
+      outOfAmmoTune();
+      sensorDelayStartTime = millis();
+      sensorDelay(500);
+      break;
+   }
+  }
+
+  communicationProtocol->initialize_packet_data(buttonState);
   communicationProtocol->start_communication();
 //  communicationProtocol->clear_serial_buffer();
 }
