@@ -461,7 +461,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
         DefaultDelegate.__init__(self)
         self.beetleId = beetleId
         self.receivingBuffer = b""
-        self.imuDataFeatureVector = {}
+        self.imuDataFeatureVectors = {}
         self.imuDataFlagCounter = 0
         self.imuDataFlags = {
             "linear-accel-vector": False,
@@ -497,13 +497,13 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                 data = {}
                 isPacketCorrect = self.verify_checksum(packetData)
 
-                if isPacketCorrect == True:
+                if isPacketCorrect:
                     sequenceNumber = struct.unpack("b", packetData[0:1])[0]
                     packetType = struct.unpack("b", packetData[1:2])[0]
 
                     if chr(packetType) == GUN:
                         print("Handle Gun Notif")
-                        gunData = struct.unpack("B", packetData[2:3])[0]
+                        gunData = struct.unpack("B", packetData[2:4])[0]
                         data["beetleId"] = self.beetleId
                         data["sequenceNumber"] = sequenceNumber
                         data["packetType"] = chr(packetType)
@@ -516,7 +516,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         print("Sent to Ultra96")
 
                     if chr(packetType) == VEST:
-                        vestData = struct.unpack("B", packetData[2:3])[0]
+                        vestData = struct.unpack("B", packetData[2:4])[0]
                         data["beetleId"] = self.beetleId
                         data["sequenceNumber"] = sequenceNumber
                         data["packetType"] = chr(packetType)
@@ -529,43 +529,43 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         print("Sent to Ultra96")
 
                     if chr(packetType) == IMU:
+                        packetId = struct.unpack("H", packetData[14:16])[0]
                         if self.imuDataFlagCounter == 0:
-                            self.imuDataFeatureVector["timestamp"] = (
+                            self.imuDataFeatureVectors[packetId]["timestamp"] = (
                                 datetime.now()
                             ).timestamp()
-                            self.imuDataFeatureVector[
+                            self.imuDataFeatureVectors[packetId][
                                 "imuDataLinearAccelX"
                             ] = struct.unpack("f", packetData[2:6])[0]
-                            self.imuDataFeatureVector[
+                            self.imuDataFeatureVectors[packetId][
                                 "imuDataLinearAccelY"
                             ] = struct.unpack("f", packetData[6:10])[0]
-                            self.imuDataFeatureVector[
+                            self.imuDataFeatureVectors[packetId][
                                 "imuDataLinearAccelZ"
                             ] = struct.unpack("f", packetData[10:14])[0]
 
                         if self.imuDataFlagCounter == 1:
-                            self.imuDataFeatureVector[
+                            self.imuDataFeatureVectors[packetId][
                                 "imuDataGyroAccelX"
                             ] = struct.unpack("f", packetData[2:6])[0]
-                            self.imuDataFeatureVector[
+                            self.imuDataFeatureVectors[packetId][
                                 "imuDataGyroAccelY"
-                            ] = struct.unpack("f", packetData[2:6])[0]
-                            self.imuDataFeatureVector[
+                            ] = struct.unpack("f", packetData[6:10])[0]
+                            self.imuDataFeatureVectors[packetId][
                                 "imuDataGyroAccelZ"
-                            ] = struct.unpack("f", packetData[2:6])[0]
+                            ] = struct.unpack("f", packetData[10:14])[0]
 
                         if self.imuDataFlagCounter == 2:
-                            self.imuDataFeatureVector["roll"] = struct.unpack(
+                            self.imuDataFeatureVectors[packetId]["roll"] = struct.unpack(
                                 "f", packetData[2:6]
                             )[0]
-                            self.imuDataFeatureVector["pitch"] = struct.unpack(
-                                "f", packetData[2:6]
+                            self.imuDataFeatureVectors[packetId]["pitch"] = struct.unpack(
+                                "f", packetData[6:10]
                             )[0]
-                            self.imuDataFeatureVector["yaw"] = struct.unpack(
-                                "f", packetData[2:6]
+                            self.imuDataFeatureVectors[packetId]["yaw"] = struct.unpack(
+                                "f", packetData[10:14]
                             )[0]
-                            # self.imuDataFeatureVector['label'] = 'Shield'
-                            self.imuDataFeatureVector["label"] = "Reload"
+                            self.imuDataFeatureVectors[packetId]["label"] = "Shield"
 
                         # imuDataLinearAccelX = struct.unpack('B', packetData[2:3])[0]
                         # imuDataLinearAccelY = struct.unpack('B', packetData[3:4])[0]
@@ -588,45 +588,43 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         # imuData['imuDataPitch'] = imuDataPitch
                         # imuData['imuDataYaw'] = imuDataYaw
 
-                        data["beetleId"] = self.beetleId
-                        data["sequenceNumber"] = sequenceNumber
-                        data["packetType"] = chr(packetType)
-                        data["dataValue"] = self.imuDataFeatureVector
-                        data["isPacketCorrupted"] = not isPacketCorrect
+                        # data["beetleId"] = self.beetleId
+                        # data["sequenceNumber"] = sequenceNumber
+                        # data["packetType"] = chr(packetType)
+                        # data["dataValue"] = self.imuDataFeatureVector
+                        # data["isPacketCorrupted"] = not isPacketCorrect
                         # StatisticsManager.set_beetle_statistics(self.beetleId, data)
-                        self.imuDataFlagCounter += 1
 
-                    if self.imuDataFlagCounter == 3:
-                        self.imuDataFlagCounter = 0
-                        print("Sending to Ultra96\n", self.imuDataFeatureVector)
-                        json_data = json.dumps(self.imuDataFeatureVector)
-                        self.laptopClient.send_plaintext(json_data)
-                        print("Sent to Ultra96")
+                        if len(self.imuDataFeatureVectors[packetId]) == 9:
+                            print("Sending to Ultra96\n", self.imuDataFeatureVectors[packetId])
+                            json_data = json.dumps(self.imuDataFeatureVectors[packetId])
+                            self.laptopClient.send_plaintext(json_data)
+                            print("Sent to Ultra96")
 
-                        # myFile = open('shield_data.csv', 'a')
-                        # writer = csv.DictWriter(myFile, fieldnames=list(self.imuDataFeatureVector.keys()))
-                        # writer.writerow(self.imuDataFeatureVector)
-                        # myFile.close()
+                            del self.imuDataFeatureVectors[packetId]
+                            myFile = open('shield_data.csv', 'a')
+                            writer = csv.DictWriter(myFile, fieldnames=list(self.imuDataFeatureVectors[packetId].keys()))
+                            writer.writerow(self.imuDataFeatureVectors[packetId])
+                            myFile.close()
 
-                        # with open('shield_data.csv', 'a') as file:
-                        #    writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ',
-                        #        'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ',
-                        #        'roll', 'pitch', 'yaw', 'label'])
-                        #    writer.writerow(self.imuDataFeatureVector)
+                            # with open('shield_data.csv', 'a') as file:
+                            #    writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ',
+                            #        'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ',
+                            #        'roll', 'pitch', 'yaw', 'label'])
+                            #    writer.writerow(self.imuDataFeatureVectors[packetId])
 
-                        # with open('reload_data.csv', 'a') as file:
-                        #     writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ',
-                        #         'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ',
-                        #         'roll', 'pitch', 'yaw', 'label'])
-                        #     writer.writerow(self.imuDataFeatureVector)
+                            # with open('reload_data.csv', 'a') as file:
+                            #     writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ',
+                            #         'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ',
+                            #         'roll', 'pitch', 'yaw', 'label'])
+                            #     writer.writerow(self.imuDataFeatureVectors[packetId])
+                            # BufferManager.relayNodeBuffer.put(self.imuDataFeatureVectors[packetId])
 
-                        self.imuDataFeatureVector = {}
-                        # BufferManager.relayNodeBuffer.put(self.imuDataFeatureVector)
                     StatusManager.set_data_ack_status(self.beetleId)
 
-                else:
-                    logging.info("Packet is corrupted!")
-                    StatusManager.set_data_nack_status(self.beetleId)
+                # else:
+                #     logging.info("Packet is corrupted!")
+                #     StatusManager.set_data_nack_status(self.beetleId)
 
             else:
                 # if data is not coming out to be correct comment out these two lines
@@ -662,7 +660,7 @@ class BlunoDevice:
     def connect_to_ultra96(self):
         self.laptopClient.connect()
         self.laptopClient.send_plaintext(PLAYER_JSON_DATA[self.beetleId])
-        receivedMessage = self.laptopClient.recv_game_state()
+        receivedMessage = self.laptopClient.recv_msg()
         logging.info(
             f"Connection successfully established between relay node and ultra-96 - {receivedMessage}"
         )
@@ -722,6 +720,7 @@ class BlunoDevice:
             try:
                 if not isHandshakeCompleted:
                     if not StatusManager.get_connection_status(self.beetleId):
+                        print("Establishing connection")
                         self.establish_connection()
                     if not StatusManager.get_reset_status(self.beetleId):
                         self.reset_controller()
@@ -794,32 +793,32 @@ if __name__ == "__main__":
     logging.info("Instantiation of threads")
     # beetleThread0 = threading.Thread(target=beetle0.transmission_protocol, args=())
     # beetleThread1 = threading.Thread(target=beetle1.transmission_protocol, args=())
-    # beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
-    # beetleThread3 = threading.Thread(target=beetle3.establish_connection, args=())
-    # beetleThread4 = threading.Thread(target=beetle4.establish_connection, args=())
-    # beetleThread5 = threading.Thread(target=beetle5.transmission_protocol, args=())
-    beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
-    beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=())
-    beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
+    beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
+    # beetleThread3 = threading.Thread(target=beetle3.transmission_protocol, args=())
+    # beetleThread4 = threading.Thread(target=beetle4.transmission_protocol, args=())
+    beetleThread5 = threading.Thread(target=beetle5.transmission_protocol, args=())
+    # beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
+    # beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=())
+    # beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
 
     # Starting beetle Threads
     # beetleThread0.start()
     # beetleThread1.start()
-    # beetleThread2.start()
+    beetleThread2.start()
     # beetleThread3.start()
     # beetleThread4.start()
-    # beetleThread5.start()
-    beetleThread6.start()
-    beetleThread7.start()
-    beetleThread8.start()
+    beetleThread5.start()
+    # beetleThread6.start()
+    # beetleThread7.start()
+    # beetleThread8.start()
 
     # Terminating beetle Threads
     # beetleThread0.join()
     # beetleThread1.join()
-    # beetleThread2.join()
+    beetleThread2.join()
     # beetleThread3.join()
     # beetleThread4.join()
-    # beetleThread5.join()
-    beetleThread6.join()
-    beetleThread7.join()
-    beetleThread8.join()
+    beetleThread5.join()
+    # beetleThread6.join()
+    # beetleThread7.join()
+    # beetleThread8.join()
