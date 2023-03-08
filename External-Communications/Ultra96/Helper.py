@@ -33,5 +33,6 @@ class Actions:
     reload = "reload"
     logout = "logout"
     all = [no, shoot, shield, grenade, reload]
+    glove = [no, shield, grenade, reload, logout]
     hit = "hit"
     blasted = "blasted"

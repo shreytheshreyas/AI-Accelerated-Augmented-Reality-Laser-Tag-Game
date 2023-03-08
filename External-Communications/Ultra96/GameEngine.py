@@ -4,15 +4,22 @@ import time
 from GameState import GameState
 from Helper import Actions
 
-TURN_MAX_TIME = 3
+TURN_MAX_TIME = 10
 
 
 class GameEngine:
     def __init__(
-        self, opp_in_frames, action_queue, eval_req_queue, eval_resp_queue, vis_queue
+        self,
+        opp_in_frames,
+        action_queue,
+        update_beetle_queue,
+        eval_req_queue,
+        eval_resp_queue,
+        vis_queue,
     ):
         self.game_state = GameState()
         self.action_queue = action_queue
+        self.update_beetle_queue = update_beetle_queue
         self.eval_req_queue = eval_req_queue
         self.eval_resp_queue = eval_resp_queue
         self.vis_queue = vis_queue
@@ -23,7 +30,19 @@ class GameEngine:
         self.turn_time_left = 0
         self.reset_turn()
 
+    def update_beetle(self, player, diff, update):
+        if "bullet" in diff:
+            self.update_beetle_queue.put((player + "_gun", update[player]["bullet"]))
+        if "health" in diff:
+            self.update_beetle_queue.put((player + "_vest", update[player]["health"]))
+
     def update_players(self, update):
+        diff_p1 = self.game_state.player_1.get_difference(update)
+        self.update_beetle("p1", diff_p1, update)
+
+        diff_p2 = self.game_state.player_2.get_difference(update)
+        self.update_beetle("p2", diff_p2, update)
+
         self.game_state.player_1.initialize_from_dict(update["p1"])
         self.game_state.player_2.initialize_from_dict(update["p2"])
 
@@ -67,7 +86,7 @@ class GameEngine:
         return self.complete["p1"] or self.complete["p2"]
 
     def is_turn_over(self):
-        print("turn is over")
+        print("Turn is over")
         self.turn_time_left = max(self.turn_end_time - time.time(), 0)
         return self.turn_time_left <= 0
 
@@ -79,6 +98,9 @@ class GameEngine:
                 self.reset_turn()
                 continue
 
+            if not self.action_queue:
+                continue
+
             player, action = self.action_queue.get()
             print(player, action)
             opp = self.get_opp(player)
@@ -87,7 +109,6 @@ class GameEngine:
                 self.signals[player]["action"] = action
             elif action == Actions.hit:
                 self.signals[opp]["opp_hit"] = True
-            # print(self.signals)
 
             self.check_turn("p1")
             self.check_turn("p2")
@@ -124,14 +145,17 @@ class GameEngine:
                 player_1.update(action_p1, action_p2, action_p2_is_valid)
                 player_2.update(action_p2, action_p1, action_p1_is_valid)
 
-                game_state = self.game_state.get_dict()
-                self.eval_req_queue.put(game_state)
-                self.vis_queue.put(game_state)
+                init_game_state = self.game_state.get_dict()
+                print("[Game State Sent]:\n" + json.dumps(init_game_state, indent=4))
 
-                update = self.eval_resp_queue.get()
-                self.update_players(update)
+                self.eval_req_queue.put(init_game_state)
+
+                updated_game_state = self.eval_resp_queue.get()
+                self.update_players(updated_game_state)
                 print(
-                    "[Game State Updated] = " + json.dumps(self.game_state.get_dict())
+                    "[Game State Updated]:\n"
+                    + json.dumps(self.game_state.get_dict(), indent=4)
                 )
+                self.vis_queue.put(updated_game_state)
 
                 self.reset_turn()

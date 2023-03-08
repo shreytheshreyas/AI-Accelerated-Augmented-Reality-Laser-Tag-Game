@@ -2,6 +2,7 @@ import base64
 import json
 import multiprocessing as mp
 import socket
+import time
 
 from Crypto import Random
 from Crypto.Cipher import AES
@@ -21,8 +22,17 @@ class EvalClient:
         self.server_name = server_name
         self.server_port = server_port
 
+        self.connected = False
+
     def connect(self):
-        self.socket.connect((self.server_name, self.server_port))
+        while not self.connected:
+            try:
+                self.socket.connect((self.server_name, self.server_port))
+                self.connected = True
+            except ConnectionRefusedError:
+                print("Connection refused. Retrying in 1 second...", end="\r")
+                time.sleep(1)
+
         print(f"Connected to Eval Server at {self.server_name}:{self.server_port}")
 
     def send_ciphertext(self, plaintext):

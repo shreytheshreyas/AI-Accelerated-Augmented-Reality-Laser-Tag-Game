@@ -3,6 +3,6 @@ import random
 
 class HWAccel_Stub:
     def get_action(self, msg):
-        index = int(msg)
+        _ = msg
         actions = ["grenade", "shield", "reload"]
-        return actions[index]
+        return actions[random.randint(0, 2)]

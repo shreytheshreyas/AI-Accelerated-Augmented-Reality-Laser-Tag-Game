@@ -3,16 +3,16 @@ import os
 import sys
 
 from EvalClient import EvalClient
-
-# from GameEngine_Stub import GameEngine_Stub
 from GameEngine import GameEngine
+
+from GameEngine_Stub import GameEngine_Stub
 from MQTTClient import MQTTClient
 
 from RelayServer import RelayServer
 
 
 class Ultra96:
-    def __init__(self, relay_host, relay_port, eval_host, eval_port):
+    def __init__(self, relay_host, relay_port, eval_host, eval_port, stub):
         self.relay_host = relay_host
         self.relay_port = relay_port
 
@@ -22,27 +22,36 @@ class Ultra96:
         self.opp_in_frames = mp.Array("i", [0] * 2)
 
         self.action_queue = mp.Queue()
+        self.update_beetle_queue = mp.Queue()
         self.eval_req_queue = mp.Queue()
         self.eval_resp_queue = mp.Queue()
         self.vis_queue = mp.Queue()
 
-        self.engine = GameEngine(
-            self.opp_in_frames,
-            self.action_queue,
-            self.eval_req_queue,
-            self.eval_resp_queue,
-            self.vis_queue,
-        )
-
-        # self.engine = GameEngine_Stub(
-        #     self.opp_in_frames, self.action_queue, self.eval_req_queue, self.vis_queue
-        # )
+        if stub:
+            self.engine = GameEngine_Stub(
+                self.opp_in_frames,
+                self.action_queue,
+                self.eval_req_queue,
+                self.vis_queue,
+            )
+        else:
+            self.engine = GameEngine(
+                self.opp_in_frames,
+                self.action_queue,
+                self.update_beetle_queue,
+                self.eval_req_queue,
+                self.eval_resp_queue,
+                self.vis_queue,
+            )
 
         self.eval_client = EvalClient(
             self.eval_host, self.eval_port, self.eval_req_queue, self.eval_resp_queue
         )
         self.relay_server = RelayServer(
-            self.relay_host, self.relay_port, self.action_queue
+            self.relay_host,
+            self.relay_port,
+            self.action_queue,
+            self.update_beetle_queue,
         )
         self.mqtt_client = MQTTClient(self.vis_queue, self.opp_in_frames)
 
@@ -56,10 +65,13 @@ class Ultra96:
         eval_process = mp.Process(target=self.eval_client.run)
 
         try:
-            eval_process.start()
+            relay_server_process.start()
             engine_process.start()
             mqtt_process.start()
-            relay_server_process.start()
+            _ = input(
+                "Ensure that components are connected then click enter to start evaluation"
+            )
+            eval_process.start()
 
             eval_process.join()
             engine_process.join()
@@ -76,23 +88,29 @@ class Ultra96:
 if __name__ == "__main__":
     relay_port = 8080
     eval_port = 2105
-    if len(sys.argv) == 0:
+    stub = False
+
+    if len(sys.argv) == 1:
         print(
             "Using default arguments of relay server port 8080 and eval client port of 2105"
         )
-
-    elif len(sys.argv) == 2:
+    elif len(sys.argv) == 3:
         relay_port = int(sys.argv[1])
         eval_port = int(sys.argv[2])
+    elif len(sys.argv) == 4:
+        relay_port = int(sys.argv[1])
+        eval_port = int(sys.argv[2])
+        if sys.argv[3] == "stub":
+            stub = True
     else:
-        print("Invalid number of arguments, 2 port numbers or nothing")
+        print("Invalid number of arguments")
         print(
             "python "
             + os.path.basename(__file__)
-            + " [<Relay Server Port> <Eval Client Port>]"
+            + " [<Relay Server Port> <Eval Client Port>] [stub]"
         )
         sys.exit()
 
-    ultra96 = Ultra96("127.0.0.1", relay_port, "127.0.0.1", eval_port)
+    ultra96 = Ultra96("127.0.0.1", relay_port, "127.0.0.1", eval_port, stub)
     ultra96.setup_connections()
     ultra96.start_game()
