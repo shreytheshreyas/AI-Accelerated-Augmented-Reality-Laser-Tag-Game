@@ -1,3 +1,6 @@
+#include <IRremote.hpp>
+#include "pitches.h"
+
 //Defining important constants
 #define PACKET_SIZE 20
 #define SENSOR_DATA 20
