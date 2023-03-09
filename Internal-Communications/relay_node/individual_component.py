@@ -377,13 +377,6 @@ class BluetoothInterfaceHandler(DefaultDelegate):
         DefaultDelegate.__init__(self)
         self.beetleId = beetleId
         self.receivingBuffer = b'' 
-        self.imuDataFeatureVector = {}
-        self.imuDataFlagCounter = 0
-        self.imuDataFlags = {
-                'linear-accel-vector': False,
-                'gyro-accel-vector': False,
-                'rotational-force-vector':False
-                }
 
     def verify_checksum(self, packetData):
         checksum = 0        
@@ -414,7 +407,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                 if isPacketCorrect == True:
                     sequenceNumber = struct.unpack('b', packetData[0:1])[0]
                     packetType = struct.unpack('b', packetData[1:2])[0]
-                
+                    samplePointId = struct.unpack('b', packetData[14:15])[0] 
                     if chr(packetType) == GUN:
                         gunData = struct.unpack('B', packetData[2:3])[0]
                         data['beetleId'] = self.beetleId
@@ -434,51 +427,14 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         StatisticsManager.set_beetle_statistics(self.beetleId, data)
 
                     if chr(packetType) == IMU:
-                        if self.imuDataFlagCounter == 0:
-                            self.imuDataFeatureVector['timestamp'] = (datetime.now()).timestamp() 
-                            self.imuDataFeatureVector['imuDataLinearAccelX'] = struct.unpack('f', packetData[2:6])[0]
-                            self.imuDataFeatureVector['imuDataLinearAccelY'] = struct.unpack('f', packetData[6:10])[0]
-                            self.imuDataFeatureVector['imuDataLinearAccelZ'] = struct.unpack('f', packetData[10:14])[0]
-
-                        if self.imuDataFlagCounter == 1:
-                            self.imuDataFeatureVector['imuDataGyroAccelX'] = struct.unpack('f', packetData[2:6])[0]
-                            self.imuDataFeatureVector['imuDataGyroAccelY'] = struct.unpack('f', packetData[6:10])[0]
-                            self.imuDataFeatureVector['imuDataGyroAccelZ'] = struct.unpack('f', packetData[10:14])[0]
-                            #self.imuDataFeatureVector['label'] = 'Shield'
-                            #self.imuDataFeatureVector['label'] = 'Reload' 
-                            self.imuDataFeatureVector['label'] = 'Play/Pause'
-
-                        #imuDataLinearAccelX = struct.unpack('B', packetData[2:3])[0]
-                        #imuDataLinearAccelY = struct.unpack('B', packetData[3:4])[0]
-                        #imuDataLinearAccelZ = struct.unpack('B', packetData[4:5])[0]
-                        #imuDataGyroAccelX = struct.unpack('B', packetData[5:6])[0]
-                        #imuDataGyroAccelY = struct.unpack('B', packetData[6:7])[0]
-                        #imuDataGyroAccelZ = struct.unpack('B', packetData[7:8])[0] 
-                        #imuDataRoll = struct.unpack('B', packetData[8:9])[0] 
-                        #imuDataPitch = struct.unpack('B', packetData[9:10])[0] 
-                        #imuDataYaw = struct.unpack('B', packetData[10:11])[0] 
-                        #imuData = {}
-
-                        #imuData['imuDataLinearAccelX'] = imuDataLinearAccelX
-                        #imuData['imuDataLinearAccelY'] = imuDataLinearAccelY
-                        #imuData['imuDataLinearAccelZ'] = imuDataLinearAccelZ
-                        #imuData['imuDataGyroAccelX'] = imuDataGyroAccelX 
-                        #imuData['imuDataGyroAccelY'] = imuDataGyroAccelY
-                        #imuData['imuDataGyroAccelZ'] = imuDataGyroAccelZ 
-                        #imuData['imuDataRoll'] = imuDataRoll
-                        #imuData['imuDataPitch'] = imuDataPitch
-                        #imuData['imuDataYaw'] = imuDataYaw 
-                        
-                        #data['beetleId'] = self.beetleId
-                        #data['sequenceNumber'] = sequenceNumber
-                        #data['packetType'] = chr(packetType)
-                        #data['dataValue'] = self.imuDataFeatureVector
-                        #data['isPacketCorrupted'] = not isPacketCorrect
-                        #StatisticsManager.set_beetle_statistics(self.beetleId, data)
-                        self.imuDataFlagCounter += 1
-                    
-                    if self.imuDataFlagCounter == 2:
-                        self.imuDataFlagCounter = 0
+                        imuDataFeatureVector = {}
+                        imuDataFeatureVector['timestamp'] = (datetime.now()).timestamp()
+                        imuDataFeatureVector['imuDataLinearAccelX'] = struct.unpack('H', packetData[2:4])[0] 
+                        imuDataFeatureVector['imuDataLinearAccelY'] = struct.unpack('H', packetData[4:6])[0] 
+                        imuDataFeatureVector['imuDataLinearAccelZ'] = struct.unpack('H', packetData[6:8])[0] 
+                        imuDataFeatureVector['imuDataGyroAccelX'] = struct.unpack('H', packetData[8:10])[0] 
+                        imuDataFeatureVector['imuDataGyroAccelY'] = struct.unpack('H', packetData[10:12])[0] 
+                        imuDataFeatureVector['imuDataGyroAccelZ'] = struct.unpack('H', packetData[12:14])[0] 
                         print(self.imuDataFeatureVector)
                         
                         #myFile = open('shield_data.csv', 'a')
@@ -499,21 +455,18 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         #        'roll', 'pitch', 'yaw', 'label'])
                         #    writer.writerow(self.imuDataFeatureVector)
                         
-                        with open('grenade.csv', 'a') as file:
-                            writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
-                                'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
-                                'roll', 'pitch', 'yaw', 'label'])
-                            writer.writerow(self.imuDataFeatureVector)
+                        #with open('grenade.csv', 'a') as file:
+                        #    writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
+                        #        'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
+                        #        'roll', 'pitch', 'yaw', 'label'])
+                        #    writer.writerow(self.imuDataFeatureVector)
                         
-                        with open('gesture_data_play_music.csv', 'a') as file:
-                            writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
-                                'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
-                                'roll', 'pitch', 'yaw', 'label'])
-                            writer.writerow(self.imuDataFeatureVector)
+                        #with open('gesture_data_play_music.csv', 'a') as file:
+                        #    writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
+                        #        'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
+                        #        'roll', 'pitch', 'yaw', 'label'])
+                        #    writer.writerow(self.imuDataFeatureVector)
 
-                        self.imuDataFeatureVector = {}
-
-                        self.imuDataFeatureVector = {}
 
                     StatusManager.set_data_ack_status(self.beetleId)
 
