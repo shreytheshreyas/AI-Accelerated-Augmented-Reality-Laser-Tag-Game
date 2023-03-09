@@ -6,7 +6,7 @@
 #define SENSOR_DATA 20
 #define SAMPLE_POINT_ID 14
 #define DATA_RATE 115200
-#define TIMEOUT 5000
+#define TIMEOUT 50
 //#define TIMEOUT 1000
 //#define TIMEOUT 5000
 
@@ -64,7 +64,7 @@ class Protocol {
     int sequenceNumber;
     int previousTime;
     int currentTime;
-    int samplePointId;
+    uint8_t samplePointId;
     imuData sensorData[SENSOR_DATA];
     imuData sensorDataTemp;
     byte packet[PACKET_SIZE];
@@ -81,6 +81,7 @@ class Protocol {
     void initialize_packet_gyro_data(void);
     void initialize_packet_rotational_force_data(void);
     void start_communication(void);
+    
 };
 
 //global variable declarations 
@@ -101,6 +102,8 @@ Protocol::Protocol() {
 
   for(int idx = 0; idx < PACKET_SIZE; idx++)
     this->packet[idx] = 0;
+
+  this->samplePointId = 0x0;
 }
 
 int Protocol::calculate_checksum(void) {
@@ -126,20 +129,20 @@ void Protocol::initialize_imu_data(float linear_accel_x, float linear_accel_y, f
   this->sensorDataTemp.gyro_accel_y = gyro_accel_y;
   this->sensorDataTemp.gyro_accel_z = gyro_accel_z;
 
-  Serial.println("Before Conversion to float-byte form");
-  Serial.print(this->sensorDataTemp.linear_accel_x);
-  Serial.print(",");
-  Serial.print(this->sensorDataTemp.linear_accel_y);
-  Serial.print(",");
-  Serial.print(this->sensorDataTemp.linear_accel_z);
-  Serial.print(",");
-  Serial.print(this->sensorDataTemp.gyro_accel_x);
-  Serial.print(",");
-  Serial.print(this->sensorDataTemp.gyro_accel_y);
-  Serial.print(",");
-  Serial.println(this->sensorDataTemp.gyro_accel_z);
-
-  Serial.println("After conversion to float-byte form");
+//  Serial.println("Before Conversion to float-byte form");
+//  Serial.print(this->sensorDataTemp.linear_accel_x);
+//  Serial.print(",");
+//  Serial.print(this->sensorDataTemp.linear_accel_y);
+//  Serial.print(",");
+//  Serial.print(this->sensorDataTemp.linear_accel_z);
+//  Serial.print(",");
+//  Serial.print(this->sensorDataTemp.gyro_accel_x);
+//  Serial.print(",");
+//  Serial.print(this->sensorDataTemp.gyro_accel_y);
+//  Serial.print(",");
+//  Serial.println(this->sensorDataTemp.gyro_accel_z);
+//
+//  Serial.println("After conversion to float-byte form");
 }
 void Protocol::initialize_packet_data(int newDataCounter) {
 //  union integerDataByteFormat samplePointNumberByteValue;
@@ -167,12 +170,12 @@ void Protocol::initialize_packet_accel_data(void) {
   vectorComponentX.floatValue = this->sensorDataTemp.linear_accel_x;
   vectorComponentY.floatValue = this->sensorDataTemp.linear_accel_y;
   vectorComponentZ.floatValue = this->sensorDataTemp.linear_accel_z;
-  Serial.print("Linear-X = ");
-  Serial.println(vectorComponentX.floatValue);
-  Serial.print("Linear-Y = ");
-  Serial.println(vectorComponentY.floatValue);
-  Serial.print("Linear-Z = ");
-  Serial.println(vectorComponentZ.floatValue);
+//  Serial.print("Linear-X = ");
+//  Serial.println(vectorComponentX.floatValue);
+//  Serial.print("Linear-Y = ");
+//  Serial.println(vectorComponentY.floatValue);
+//  Serial.print("Linear-Z = ");
+//  Serial.println(vectorComponentZ.floatValue);
   
   for (int i = 2; i < 6; i++) {
     this->packet[i] = vectorComponentX.byteValue[i - 2];
@@ -195,12 +198,12 @@ void Protocol::initialize_packet_gyro_data(void) {
   vectorComponentX.floatValue = this->sensorDataTemp.gyro_accel_x;
   vectorComponentY.floatValue = this->sensorDataTemp.gyro_accel_y;
   vectorComponentZ.floatValue = this->sensorDataTemp.gyro_accel_z;
-  Serial.print("Gyro-X = ");
-  Serial.println(vectorComponentX.floatValue);
-  Serial.print("Gyro-Y = ");
-  Serial.println(vectorComponentY.floatValue);
-  Serial.print("Gyro-Z = ");
-  Serial.println(vectorComponentZ.floatValue);
+//  Serial.print("Gyro-X = ");
+//  Serial.println(vectorComponentX.floatValue);
+//  Serial.print("Gyro-Y = ");
+//  Serial.println(vectorComponentY.floatValue);
+//  Serial.print("Gyro-Z = ");
+//  Serial.println(vectorComponentZ.floatValue);
   
   for (int i = 2; i < 6; i++) {
     this->packet[i] = vectorComponentX.byteValue[i - 2];
@@ -313,7 +316,7 @@ void loop() {
     
   communicationProtocol->initialize_packet_data(newDataCounter);
   communicationProtocol->start_communication();
-//  communicationProtocol->clear_serial_buffer();
+  communicationProtocol->clear_serial_buffer();
   newDataCounter = (newDataCounter + 1) % 2;
 }
 
