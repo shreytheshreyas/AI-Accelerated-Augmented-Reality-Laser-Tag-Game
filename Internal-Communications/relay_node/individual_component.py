@@ -429,12 +429,12 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                     if chr(packetType) == IMU:
                         imuDataFeatureVector = {}
                         imuDataFeatureVector['timestamp'] = (datetime.now()).timestamp()
-                        imuDataFeatureVector['imuDataLinearAccelX'] = struct.unpack('H', packetData[2:4])[0] 
-                        imuDataFeatureVector['imuDataLinearAccelY'] = struct.unpack('H', packetData[4:6])[0] 
-                        imuDataFeatureVector['imuDataLinearAccelZ'] = struct.unpack('H', packetData[6:8])[0] 
-                        imuDataFeatureVector['imuDataGyroAccelX'] = struct.unpack('H', packetData[8:10])[0] 
-                        imuDataFeatureVector['imuDataGyroAccelY'] = struct.unpack('H', packetData[10:12])[0] 
-                        imuDataFeatureVector['imuDataGyroAccelZ'] = struct.unpack('H', packetData[12:14])[0] 
+                        imuDataFeatureVector['imuDataLinearAccelX'] = struct.unpack('h', packetData[2:4])[0] 
+                        imuDataFeatureVector['imuDataLinearAccelY'] = struct.unpack('h', packetData[4:6])[0] 
+                        imuDataFeatureVector['imuDataLinearAccelZ'] = struct.unpack('h', packetData[6:8])[0] 
+                        imuDataFeatureVector['imuDataGyroAccelX'] = struct.unpack('h', packetData[8:10])[0] 
+                        imuDataFeatureVector['imuDataGyroAccelY'] = struct.unpack('h', packetData[10:12])[0] 
+                        imuDataFeatureVector['imuDataGyroAccelZ'] = struct.unpack('h', packetData[12:14])[0] 
                         print(self.imuDataFeatureVector)
                         
                         #myFile = open('shield_data.csv', 'a')
