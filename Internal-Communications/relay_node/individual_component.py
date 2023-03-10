@@ -36,12 +36,12 @@ VEST = 'V' #The ASCII code associated with V is 86
 
 
 MAC_ADDRESSES = {
-        0: 'D0:39:72:BF:CA:D4',
+        0: '',
         1: 'D0:39:72:BF:C3:8F',
-        2: 'D0:39:72:BF:C8:D8',
-        3: 'a',
-        4: 'a',
-        5: 'D0:39:72:BF:C3:D6',
+        2: 'D0:39:72:BF:CA:D4',
+        3: '',
+        4: '',
+        5: 'D0:39:72:BF:C8:D8',
         6: 'D0:39:72:BF:C8:89',
         7: 'D0:39:72:BF:C8:D7',
         8: '6C:79:B8:D3:6A:A3'
@@ -382,6 +382,8 @@ class BluetoothInterfaceHandler(DefaultDelegate):
         checksum = 0        
         for idx in range(len(packetData) - 1):
             checksum = (checksum ^ packetData[idx])
+            #print(f'calculated checksum = {checksum}')
+            #print(f'actual checksum = {packetData[19]}')
         return  packetData[19] == checksum
 
     def handleNotification(self, cHandle, data):
@@ -404,7 +406,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                 data = {}
                 isPacketCorrect = self.verify_checksum(packetData)
 
-                if isPacketCorrect == True:
+                if isPacketCorrect:
                     sequenceNumber = struct.unpack('b', packetData[0:1])[0]
                     packetType = struct.unpack('b', packetData[1:2])[0]
                     samplePointId = struct.unpack('b', packetData[14:15])[0] 
@@ -429,13 +431,17 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                     if chr(packetType) == IMU:
                         imuDataFeatureVector = {}
                         imuDataFeatureVector['timestamp'] = (datetime.now()).timestamp()
-                        imuDataFeatureVector['imuDataLinearAccelX'] = struct.unpack('h', packetData[2:4])[0] 
-                        imuDataFeatureVector['imuDataLinearAccelY'] = struct.unpack('h', packetData[4:6])[0] 
-                        imuDataFeatureVector['imuDataLinearAccelZ'] = struct.unpack('h', packetData[6:8])[0] 
-                        imuDataFeatureVector['imuDataGyroAccelX'] = struct.unpack('h', packetData[8:10])[0] 
-                        imuDataFeatureVector['imuDataGyroAccelY'] = struct.unpack('h', packetData[10:12])[0] 
-                        imuDataFeatureVector['imuDataGyroAccelZ'] = struct.unpack('h', packetData[12:14])[0] 
-                        print(self.imuDataFeatureVector)
+                        imuDataFeatureVector['imuDataLinearAccelX'] = struct.unpack('>h', packetData[2:4])[0] / 1024 
+                        imuDataFeatureVector['imuDataLinearAccelY'] = struct.unpack('>h', packetData[4:6])[0] / 1024
+                        imuDataFeatureVector['imuDataLinearAccelZ'] = struct.unpack('>h', packetData[6:8])[0] / 1024
+                        imuDataFeatureVector['imuDataGyroAccelX'] = struct.unpack('>h', packetData[8:10])[0] / 128
+                        imuDataFeatureVector['imuDataGyroAccelY'] = struct.unpack('>h', packetData[10:12])[0] / 128
+                        imuDataFeatureVector['imuDataGyroAccelZ'] = struct.unpack('>h', packetData[12:14])[0] / 128
+                        #imuDataFeatureVector['label'] = 'grenade'
+                        imuDataFeatureVector['label'] = 'shield'
+                        #imuDataFeatureVector['label'] = 'reload'
+                        #print(packetData)
+                        print(imuDataFeatureVector)
                         
                         #myFile = open('shield_data.csv', 'a')
                         #writer = csv.DictWriter(myFile, fieldnames=list(self.imuDataFeatureVector.keys()))
@@ -455,11 +461,11 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         #        'roll', 'pitch', 'yaw', 'label'])
                         #    writer.writerow(self.imuDataFeatureVector)
                         
-                        #with open('grenade.csv', 'a') as file:
-                        #    writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
-                        #        'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
-                        #        'roll', 'pitch', 'yaw', 'label'])
-                        #    writer.writerow(self.imuDataFeatureVector)
+                        with open('grenade.csv', 'a') as file:
+                            writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
+                                'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
+                                'roll', 'pitch', 'yaw', 'label'])
+                            writer.writerow(imuDataFeatureVector)
                         
                         #with open('gesture_data_play_music.csv', 'a') as file:
                         #    writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
