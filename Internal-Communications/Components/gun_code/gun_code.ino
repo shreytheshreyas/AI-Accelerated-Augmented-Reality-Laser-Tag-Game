@@ -25,7 +25,7 @@ int buttonState = 0;
 
 const uint16_t PLAYER_1_ADDRESS = 0x0102;
 const uint16_t PLAYER_2_ADDRESS = 0x0105;
-const uint8_t command = 0x01; //1 for player 1
+const uint8_t command = 0x02; //1 for player 1
 
 uint8_t ammoStatus = 0;
 uint8_t repeats = 1;

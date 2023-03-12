@@ -204,7 +204,7 @@ void loop() {
 //  Serial.flush();
     if (IrReceiver.decode()) {  
     
-    IrReceiver.printIRResultShort(&Serial);
+//    IrReceiver.printIRResultShort(&Serial);
 //    Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);
     
     if (IrReceiver.decodedIRData.command == 0x02) {   //if hit by player 2's shot
@@ -214,7 +214,7 @@ void loop() {
 //      Serial.println("Received signal");  //debug
        
       if (isShot == true && health == 0) {
-        lifeStatus = 13;
+//        lifeStatus = 13;
         sendData = true;
         display.setSegments(DEAD);
         deadTune();
@@ -222,7 +222,7 @@ void loop() {
       } 
       else if (isShot == true){
         shotCounter += 1;
-        lifeStatus = 1;
+//        lifeStatus = 1; 
         sendData = true;
         health = 100 - shotCounter*10;
         tone(BUZZER_PIN,5000,100);
@@ -233,7 +233,7 @@ void loop() {
           deadTune();
           sensorDelayStartTime = millis();
           sensorDelay(100);
-          health = 100;
+//          health = 100; //uncomment later
           display.showNumberDec(health);
         }
         else {
@@ -244,9 +244,12 @@ void loop() {
 
       }       
     }
-//    IrReceiver.begin(IR_RCV_PIN); //continue receiving IR signals
-     IrReceiver.resume();
+    IrReceiver.begin(IR_RCV_PIN); //continue receiving IR signals
+//     IrReceiver.resume();
   }
+
+  lifeStatus = (health == 0) ? 13 : 1;
+  
   communicationProtocol->initialize_packet_data();
   communicationProtocol->start_communication();
 //  communicationProtocol->clear_serial_buffer();
