@@ -40,7 +40,7 @@ MAC_ADDRESSES = {
         1: 'D0:39:72:BF:C3:8F',
         2: 'D0:39:72:BF:CA:D4',
         3: 'D0:39:72:BF:CD:20',
-        4: '',
+        4: 'D0:39:72:BF:CD:0A',
         5: 'D0:39:72:BF:C8:D8',
         6: 'D0:39:72:BF:C8:89',
         7: 'D0:39:72:BF:C8:D7',
@@ -423,7 +423,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                   
                     if chr(packetType) == VEST:
                         vestData = struct.unpack('B', packetData[2:3])[0]
-                        
+                        print(f'vest data received = {vestData}')
                         if vestData == 1:
                             print('Player health decreased by 10HP')
                         
@@ -615,7 +615,7 @@ if __name__ == '__main__':
     beetleThread1 = threading.Thread(target=beetle1.transmission_protocol, args=()) 
     beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
     beetleThread3 = threading.Thread(target=beetle3.transmission_protocol, args=())
-    #beetleThread4 = threading.Thread(target=beetle4.establish_connection, args=())
+    beetleThread4 = threading.Thread(target=beetle4.transmission_protocol, args=())
     beetleThread5 = threading.Thread(target=beetle5.transmission_protocol, args=())
     #beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
     #beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=())
@@ -626,7 +626,7 @@ if __name__ == '__main__':
     beetleThread1.start()
     #beetleThread2.start()
     beetleThread3.start()
-    #beetleThread4.start()
+    beetleThread4.start()
     #beetleThread5.start()
     #beetleThread6.start()
     #beetleThread7.start()
@@ -637,7 +637,7 @@ if __name__ == '__main__':
     beetleThread1.join()
     #beetleThread2.join()
     beetleThread3.join()
-    #beetleThread4.join()
+    beetleThread4.join()
     #beetleThread5.join()
     #beetleThread6.join()
     #beetleThread7.join()
