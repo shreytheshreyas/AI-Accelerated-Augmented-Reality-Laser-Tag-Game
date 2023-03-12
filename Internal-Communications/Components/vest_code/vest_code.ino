@@ -34,6 +34,8 @@ bool isShot = false;  //To indicate if hit is registered
 uint8_t shotID;
 uint8_t shotCounter = 0;
 uint8_t health = 100;
+uint8_t lifeStatus = 0;
+bool sendData = false;
 unsigned long sensorDelayStartTime = 0;
 
 const uint8_t DEAD[] = {
@@ -115,7 +117,7 @@ void Protocol::get_sensor_data() {
 void Protocol::initialize_packet_data() {
   this->packet[0] = this->sequenceNumber;
   this->packet[1] = VEST_DATA;
-  this->packet[2] = this->sensorData[sensorDataIdx];
+  this->packet[2] = lifeStatus;
   this->packet[PACKET_SIZE - 1] = this->calculate_checksum(); 
 }
 
@@ -160,8 +162,9 @@ void Protocol::start_communication() {
                 break;
     }
 
-  if ( (hasHandshakeEnded) && (currentTime -  previousTime > TIMEOUT) &&  receivedData != ACK) { 
+  if ( (hasHandshakeEnded) && (currentTime -  previousTime > TIMEOUT) &&  receivedData != ACK && sendData) { 
     Serial.write((byte*)&packet, sizeof(packet));
+    sendData = false;
     previousTime = currentTime;
   }
 
@@ -202,21 +205,25 @@ void loop() {
     if (IrReceiver.decode()) {  
     
     IrReceiver.printIRResultShort(&Serial);
-    Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);
+//    Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);
     
     if (IrReceiver.decodedIRData.command == 0x02) {   //if hit by player 2's shot
       isShot = true;
            
       shotID = IrReceiver.decodedIRData.command;  //shotID of the player that hit you
-      Serial.println("Received signal");  //debug
+//      Serial.println("Received signal");  //debug
        
       if (isShot == true && health == 0) {
+        lifeStatus = 13;
+        sendData = true;
         display.setSegments(DEAD);
         deadTune();
         health = 0;
       } 
       else if (isShot == true){
         shotCounter += 1;
+        lifeStatus = 1;
+        sendData = true;
         health = 100 - shotCounter*10;
         tone(BUZZER_PIN,5000,100);
         isShot = false;
@@ -227,7 +234,7 @@ void loop() {
           sensorDelayStartTime = millis();
           sensorDelay(100);
           health = 100;
-          display.setshowNumberDec(health);
+          display.showNumberDec(health);
         }
         else {
           display.showNumberDec(health);
@@ -237,8 +244,8 @@ void loop() {
 
       }       
     }
-    IrReceiver.begin(IR_RCV_PIN); //continue receiving IR signals
-    // IrReceiver.resume();
+//    IrReceiver.begin(IR_RCV_PIN); //continue receiving IR signals
+     IrReceiver.resume();
   }
   communicationProtocol->initialize_packet_data();
   communicationProtocol->start_communication();

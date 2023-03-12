@@ -26,6 +26,8 @@ int buttonState = 0;
 const uint16_t PLAYER_1_ADDRESS = 0x0102;
 const uint16_t PLAYER_2_ADDRESS = 0x0105;
 const uint8_t command = 0x01; //1 for player 1
+
+uint8_t ammoStatus = 0;
 uint8_t repeats = 1;
 uint8_t shotCounter = 0;
 unsigned long sensorDelayStartTime = 0;
@@ -73,7 +75,7 @@ Protocol::Protocol() {
 int Protocol::calculate_checksum(void) {
   uint8_t checksum = 0;
   
-  for(int idx = 0; idx < PACKET_SIZE-1; idx++)
+  for(int idx = 0; idx < 5; idx++)
     checksum ^= this->packet[idx];
 
   return checksum;
@@ -91,7 +93,7 @@ void Protocol::get_sensor_data() {
 void Protocol::initialize_packet_data(int16_t buttonStateData) {
   this->packet[0] = this->sequenceNumber;
   this->packet[1] = GUN_DATA;
-  this->packet[2] = byte('1');
+  this->packet[2] = ammoStatus;
   this->packet[4] = this->sensorData[sensorDataIdx];
   this->packet[PACKET_SIZE - 1] = this->calculate_checksum(); 
 }
@@ -178,11 +180,12 @@ void loop() {
   if (buttonState == 0) {
     shotCounter += 1;
     sendDataPacket = true;
+    ammoStatus = 1;
     switch (shotCounter) {
       case 1:
       IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
-      Serial.println("signal has been sent");
-      Serial.println(buttonState);
+//      Serial.println("signal has been sent");
+//      Serial.println(buttonState);
       tone(buzzerPin,NOTE_C6,100);
       sensorDelayStartTime = millis();
       sensorDelay(500);
@@ -190,8 +193,8 @@ void loop() {
 
       case 2:
       IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
-      Serial.println("signal has been sent");
-      Serial.println(buttonState);
+//      Serial.println("signal has been sent");
+//      Serial.println(buttonState);
       tone(buzzerPin,NOTE_D6  ,100);
       sensorDelayStartTime = millis();
       sensorDelay(500);
@@ -199,8 +202,8 @@ void loop() {
 
       case 3:
       IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
-      Serial.println("signal has been sent");
-      Serial.println(buttonState);
+//      Serial.println("signal has been sent");
+//      Serial.println(buttonState);
       tone(buzzerPin,NOTE_E6,100);
       sensorDelayStartTime = millis();
       sensorDelay(500);
@@ -208,8 +211,8 @@ void loop() {
 
       case 4:
       IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
-      Serial.println("signal has been sent");
-      Serial.println(buttonState);
+//      Serial.println("signal has been sent");
+//      Serial.println(buttonState);
       tone(buzzerPin,NOTE_F6,100);
       sensorDelayStartTime = millis();
       sensorDelay(500);
@@ -217,8 +220,8 @@ void loop() {
 
       case 5:
       IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
-      Serial.println("signal has been sent");
-      Serial.println(buttonState);
+//      Serial.println("signal has been sent");
+//      Serial.println(buttonState);
       tone(buzzerPin,NOTE_G6,100);
       sensorDelayStartTime = millis();
       sensorDelay(500);
@@ -226,8 +229,44 @@ void loop() {
 
       case 6:
       IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
-      Serial.println("signal has been sent");
-      Serial.println(buttonState);
+//      Serial.println("signal has been sent");
+//      Serial.println(buttonState);
+      tone(buzzerPin,NOTE_A6,100);
+      sensorDelayStartTime = millis();
+      sensorDelay(500);
+      break;
+
+      case 7:
+      IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+//      Serial.println("signal has been sent");
+//      Serial.println(buttonState);
+      tone(buzzerPin,NOTE_A6,100);
+      sensorDelayStartTime = millis();
+      sensorDelay(500);
+      break;
+
+      case 8:
+      IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+//      Serial.println("signal has been sent");
+//      Serial.println(buttonState);
+      tone(buzzerPin,NOTE_A6,100);
+      sensorDelayStartTime = millis();
+      sensorDelay(500);
+      break;
+
+      case 9:
+      IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+//      Serial.println("signal has been sent");
+//      Serial.println(buttonState);
+      tone(buzzerPin,NOTE_A6,100);
+      sensorDelayStartTime = millis();
+      sensorDelay(500);
+      break;
+
+      case 10:
+      IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+//      Serial.println("signal has been sent");
+//      Serial.println(buttonState);
       tone(buzzerPin,NOTE_A6,100);
       sensorDelayStartTime = millis();
       sensorDelay(500);
@@ -242,8 +281,9 @@ void loop() {
       // break;
 
       default:
-      Serial.println("out of ammo");
+//      Serial.println("out of ammo");
       outOfAmmoTune();
+      ammoStatus = 13;
       sensorDelayStartTime = millis();
       sensorDelay(500);
       break;
