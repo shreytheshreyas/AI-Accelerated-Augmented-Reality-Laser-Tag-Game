@@ -39,7 +39,7 @@ MAC_ADDRESSES = {
         0: '',
         1: 'D0:39:72:BF:C3:8F',
         2: 'D0:39:72:BF:CA:D4',
-        3: '',
+        3: 'D0:39:72:BF:CD:20',
         4: '',
         5: 'D0:39:72:BF:C8:D8',
         6: 'D0:39:72:BF:C8:89',
@@ -411,12 +411,10 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                     packetType = struct.unpack('b', packetData[1:2])[0]
                     samplePointId = struct.unpack('b', packetData[14:15])[0] 
                     if chr(packetType) == GUN:
-                        gunData = struct.unpack('B', packetData[2:3])[0]
-                        data['beetleId'] = self.beetleId
-                        data['sequenceNumber'] = sequenceNumber
-                        data['packetType'] = chr(packetType)
-                        data['dataValue'] = gunData
-                        data['isPacketCorrupted'] = not isPacketCorrect
+                        gunData = struct.unpack('b', packetData[2:3])[0]
+                        
+                        if chr(gunData) == ('1'):
+                            print('Ammo decreased by one count')
                         StatisticsManager.set_beetle_statistics(self.beetleId, data)
                   
                     if chr(packetType) == VEST:
@@ -610,7 +608,7 @@ if __name__ == '__main__':
     #beetleThread0 = threading.Thread(target=beetle0.transmission_protocol, args=())
     #beetleThread1 = threading.Thread(target=beetle1.transmission_protocol, args=()) 
     beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
-    #beetleThread3 = threading.Thread(target=beetle3.establish_connection, args=())
+    beetleThread3 = threading.Thread(target=beetle3.transmission_protocol, args=())
     #beetleThread4 = threading.Thread(target=beetle4.establish_connection, args=())
     beetleThread5 = threading.Thread(target=beetle5.transmission_protocol, args=())
     #beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
@@ -620,22 +618,22 @@ if __name__ == '__main__':
     #Starting beetle Threads
     #beetleThread0.start()
     #beetleThread1.start()
-    beetleThread2.start()
-    #beetleThread3.start()
+    #beetleThread2.start()
+    beetleThread3.start()
     #beetleThread4.start()
-    beetleThread5.start()
+    #beetleThread5.start()
     #beetleThread6.start()
     #beetleThread7.start()
-    beetleThread8.start()
+    #beetleThread8.start()
 
     #Terminating beetle Threads
     #beetleThread0.join()
     #beetleThread1.join()
-    beetleThread2.join()
-    #beetleThread3.join()
+    #beetleThread2.join()
+    beetleThread3.join()
     #beetleThread4.join()
-    beetleThread5.join()
+    #beetleThread5.join()
     #beetleThread6.join()
     #beetleThread7.join()
-    beetleThread8.join()
+    #beetleThread8.join()
 
