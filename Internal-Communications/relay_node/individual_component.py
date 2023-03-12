@@ -411,19 +411,25 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                     packetType = struct.unpack('b', packetData[1:2])[0]
                     samplePointId = struct.unpack('b', packetData[14:15])[0] 
                     if chr(packetType) == GUN:
-                        gunData = struct.unpack('b', packetData[2:3])[0]
-                        
-                        if chr(gunData) == ('1'):
+                        gunData = struct.unpack('B', packetData[2:3])[0]
+
+                        if gunData == 1:
                             print('Ammo decreased by one count')
+
+                        if gunData == 13:
+                            print('Gun is out of ammo')
+
                         StatisticsManager.set_beetle_statistics(self.beetleId, data)
                   
                     if chr(packetType) == VEST:
-                        vestData = struct.unpack('B', packetData[2:3])[0]     
-                        data['beetleId'] = self.beetleId
-                        data['sequenceNumber'] = sequenceNumber
-                        data['packetType'] = chr(packetType)
-                        data['dataValue'] = vestData
-                        data['isPacketCorrupted'] = not isPacketCorrect
+                        vestData = struct.unpack('B', packetData[2:3])[0]
+                        
+                        if vestData == 1:
+                            print('Player health decreased by 10HP')
+                        
+                        if vestData == 13:
+                            print('Player is dead')
+                        
                         StatisticsManager.set_beetle_statistics(self.beetleId, data)
 
                     if chr(packetType) == IMU:
@@ -606,7 +612,7 @@ if __name__ == '__main__':
     #Instantiation of Threads 
     logging.info('Instantiation of threads')
     #beetleThread0 = threading.Thread(target=beetle0.transmission_protocol, args=())
-    #beetleThread1 = threading.Thread(target=beetle1.transmission_protocol, args=()) 
+    beetleThread1 = threading.Thread(target=beetle1.transmission_protocol, args=()) 
     beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
     beetleThread3 = threading.Thread(target=beetle3.transmission_protocol, args=())
     #beetleThread4 = threading.Thread(target=beetle4.establish_connection, args=())
@@ -617,7 +623,7 @@ if __name__ == '__main__':
     
     #Starting beetle Threads
     #beetleThread0.start()
-    #beetleThread1.start()
+    beetleThread1.start()
     #beetleThread2.start()
     beetleThread3.start()
     #beetleThread4.start()
@@ -628,7 +634,7 @@ if __name__ == '__main__':
 
     #Terminating beetle Threads
     #beetleThread0.join()
-    #beetleThread1.join()
+    beetleThread1.join()
     #beetleThread2.join()
     beetleThread3.join()
     #beetleThread4.join()
