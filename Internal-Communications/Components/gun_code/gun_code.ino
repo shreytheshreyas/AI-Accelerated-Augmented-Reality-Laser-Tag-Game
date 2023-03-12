@@ -29,11 +29,7 @@ const uint8_t command = 0x01; //1 for player 1
 uint8_t repeats = 1;
 uint8_t shotCounter = 0;
 unsigned long sensorDelayStartTime = 0;
-
-typedef union integerDataByteFormat{
- byte byteValue[2];
- int intValue;  
-};
+byte sendDataPacket = false;
 
 //Class definition for protocol
 class Protocol {
@@ -50,7 +46,7 @@ class Protocol {
     int calculate_checksum(void);
     void clear_serial_buffer(void);
     void get_sensor_data(void);
-    void initialize_packet_data(void);
+    void initialize_packet_data(int16_t);
     void start_communication(void);
 };
 
@@ -92,17 +88,16 @@ void Protocol::get_sensor_data() {
   return;
 }
 
-void Protocol::initialize_packet_data(int buttonStateData) {
-  union integerDataFormat buttonStateData;
+void Protocol::initialize_packet_data(int16_t buttonStateData) {
   this->packet[0] = this->sequenceNumber;
-  this->packet[1] = buttonStateData.byteValue[0];
-  this->packet[2] = buttonStateData.byteValue[1];
-  this->packet[3] = this->sensorData[sensorDataIdx];
+  this->packet[1] = GUN_DATA;
+  this->packet[2] = byte('1');
+  this->packet[4] = this->sensorData[sensorDataIdx];
   this->packet[PACKET_SIZE - 1] = this->calculate_checksum(); 
 }
 
 void Protocol::start_communication() {
-   currentTime = millis();
+   this->currentTime = millis();
 
 //    if (!Serial.available())
 //      return;
@@ -123,8 +118,6 @@ void Protocol::start_communication() {
 
       case DATA_ACK: 
                 this->sequenceNumber++;
-                this->sensorDataIdx = (this->sensorDataIdx + 1) % 20;
-                
                 break;
 
       case DATA_NACK:
@@ -142,9 +135,10 @@ void Protocol::start_communication() {
                 break;
     }
 
-  if ( (hasHandshakeEnded) && (currentTime -  previousTime > TIMEOUT) &&  receivedData != ACK) { 
+  if ( (hasHandshakeEnded) && (currentTime -  previousTime > TIMEOUT) &&  receivedData != ACK && sendDataPacket) { 
     Serial.write((byte*)&packet, sizeof(packet));
-    previousTime = currentTime;
+    sendDataPacket = false;
+    this->previousTime = this->currentTime;
   }
 
   this->clear_serial_buffer();
@@ -179,10 +173,11 @@ void setup() {
 void loop() {
 //  Serial.flush();
   buttonState = digitalRead(buttonPin);
-  Serial.println(buttonState);
+//  Serial.println(buttonState);
 
   if (buttonState == 0) {
     shotCounter += 1;
+    sendDataPacket = true;
     switch (shotCounter) {
       case 1:
       IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
