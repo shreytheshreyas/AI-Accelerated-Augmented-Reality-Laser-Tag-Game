@@ -23,6 +23,7 @@ actions = {
     "1r": "p1_reload",
     "2r": "p2_reload",
 }
+start_game_lock = mp.Lock()
 opp_in_frames = mp.Array("i", [0] * 2)
 action_queue = mp.Queue()
 eval_req_queue = mp.Queue()
@@ -30,7 +31,12 @@ eval_resp_queue = mp.Queue()
 vis_queue = mp.Queue()
 
 engine = GameEngine(
-    opp_in_frames, action_queue, eval_req_queue, eval_resp_queue, vis_queue
+    start_game_lock,
+    opp_in_frames,
+    action_queue,
+    eval_req_queue,
+    eval_resp_queue,
+    vis_queue,
 )
 
 evalclient = EvalClient("127.0.0.1", 2108, eval_req_queue, eval_resp_queue)

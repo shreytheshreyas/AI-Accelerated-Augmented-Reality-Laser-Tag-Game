@@ -2,9 +2,7 @@ import json
 import multiprocessing as mp
 import socket
 
-from Helper import Actions
 from HWAccel import HWAccel
-
 from HWAccel_Stub import HWAccel_Stub
 from Test import get_queue
 
@@ -16,6 +14,8 @@ COMPONENT_IDS = {
     "p2_vest": 4,
     "p2_glove": 5,
 }
+
+SENSOR_MAPPING = {"gun": "bullets", "vest": "hp"}
 
 
 class RelayServer:
@@ -82,12 +82,24 @@ class RelayServer:
             success = False
         return success
 
-    def update(self, update_beetle_queue):
-        while True:
-            conn, data = update_beetle_queue.get()
-            self.send_plaintext(data, conn)
+    def update_beetles(self, update_beetle_queue, edit_conn_queue):
+        conns = {
+            "p1_gun": None,
+            "p1_vest": None,
+            "p2_gun": None,
+            "p2_vest": None,
+        }
 
-    def handle_gun_conn(self, conn, action_queue, player, component):
+        while True:
+            if edit_conn_queue:
+                component, conn = edit_conn_queue.get()
+                conns[component] = conn
+
+            if update_beetle_queue:
+                component, data = update_beetle_queue.get()
+                self.send_plaintext(str(data), conns[component])
+
+    def handle_gun_conn(self, conn, action_queue, edit_conn_queue, player, component):
         while True:
             msg = self.recv_msg(conn)
             if not msg:
@@ -99,11 +111,12 @@ class RelayServer:
             action_queue.put((player, "shoot"))
 
         conn.close()
+        edit_conn_queue.put((component, None))
         with self.connected.get_lock():
             self.connected[COMPONENT_IDS[component]] = False
             print(f"Connection to {component} ended")
 
-    def handle_vest_conn(self, conn, action_queue, player, component):
+    def handle_vest_conn(self, conn, action_queue, edit_conn_queue, player, component):
         while True:
             msg = self.recv_msg(conn)
             if not msg:
@@ -113,9 +126,9 @@ class RelayServer:
             #     break
 
             action_queue.put((player, "hit"))
-            # self.send_plaintext(msg, conn)
 
         conn.close()
+        edit_conn_queue.put((component, None))
         with self.connected.get_lock():
             self.connected[COMPONENT_IDS[component]] = False
             print(f"Connection to {component} ended")
@@ -126,8 +139,8 @@ class RelayServer:
             if not msg:
                 break
             action = self.ai.get_action(msg)
-            if action != Actions.no:
-                action_queue.put((player, action))
+
+            action_queue.put((player, action))
 
         conn.close()
         with self.connected.get_lock():
@@ -151,6 +164,8 @@ class RelayServer:
         player = data["player"]
         component = player + "_" + sensor
 
+        self.action_queue.put((player, "conn_" + sensor))
+
         with self.connected.get_lock():
             id = COMPONENT_IDS[component]
             if self.connected[id]:
@@ -165,7 +180,7 @@ class RelayServer:
 
     def run(self):
         update_process = mp.Process(
-            target=self.update,
+            target=self.update_beetles,
             args=(
                 self.update_beetle_queue,
                 self.edit_conn_queue,

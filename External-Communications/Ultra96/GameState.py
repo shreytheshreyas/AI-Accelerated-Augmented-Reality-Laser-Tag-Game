@@ -11,11 +11,11 @@ class GameState:
     """
 
     def __init__(self):
-        self.player_1 = StateStaff()
-        self.player_2 = StateStaff()
+        self.p1 = StateStaff()
+        self.p2 = StateStaff()
 
     def get_dict(self):
-        data = {"p1": self.player_1.get_dict(), "p2": self.player_2.get_dict()}
+        data = {"p1": self.p1.get_dict(), "p2": self.p2.get_dict()}
         return data
 
     def _get_data_plain_text(self):
@@ -51,9 +51,9 @@ class GameState:
         num_deaths,
     ):
         if player_id == 1:
-            player = self.player_1
+            player = self.p1
         else:
-            player = self.player_2
+            player = self.p2
         player.initialize(
             action,
             bullets_remaining,
@@ -89,5 +89,5 @@ class GameState:
             )
 
     def init_players(self, player_1: PlayerStateBase, player_2: PlayerStateBase):
-        self.player_1.initialize_from_player_state(player_1)
-        self.player_2.initialize_from_player_state(player_2)
+        self.p1.initialize_from_player_state(player_1)
+        self.p2.initialize_from_player_state(player_2)

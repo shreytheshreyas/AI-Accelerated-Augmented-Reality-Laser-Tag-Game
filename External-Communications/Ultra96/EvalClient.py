@@ -51,8 +51,8 @@ class EvalClient:
             success = False
         return success
 
-    def recv_game_state(self):
-        game_state_received = None
+    def recv_msg(self):
+        msg = None
         try:
             data = b""
             while not data.endswith(b"_"):
@@ -80,13 +80,12 @@ class EvalClient:
                 return None
 
             msg = data.decode("utf-8")
-            game_state_received = msg
 
         except ConnectionResetError:
             print("Connection Reset")
             return None
 
-        return game_state_received
+        return msg
 
     def run(self):
         while True:
@@ -94,7 +93,7 @@ class EvalClient:
             eval_json = json.dumps(eval_data)
             self.send_ciphertext(eval_json)
 
-            recv_json = self.recv_game_state()
+            recv_json = self.recv_msg()
             if not recv_json:
                 break
 

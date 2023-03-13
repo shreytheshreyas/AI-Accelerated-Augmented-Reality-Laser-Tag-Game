@@ -4,7 +4,9 @@ import time
 from GameState import GameState
 from Helper import Actions
 
-TURN_MAX_TIME = 10
+TURN_MAX_TIME = 3
+
+SENSOR_MAPPING = {"gun": "bullets", "vest": "hp"}
 
 
 class GameEngine:
@@ -30,21 +32,22 @@ class GameEngine:
         self.turn_time_left = 0
         self.reset_turn()
 
-    def update_beetle(self, player, diff, update):
-        if "bullet" in diff:
-            self.update_beetle_queue.put((player + "_gun", update[player]["bullet"]))
-        if "health" in diff:
-            self.update_beetle_queue.put((player + "_vest", update[player]["health"]))
-
     def update_players(self, update):
-        diff_p1 = self.game_state.player_1.get_difference(update)
-        self.update_beetle("p1", diff_p1, update)
+        player_1 = self.game_state.p1
+        player_2 = self.game_state.p2
 
-        diff_p2 = self.game_state.player_2.get_difference(update)
-        self.update_beetle("p2", diff_p2, update)
+        if update["p1"]["bullets"] != player_1.bullets:
+            self.update_beetle_queue.put(("p1_gun", update["p1"]["bullets"]))
+        if update["p2"]["bullets"] != player_2.bullets:
+            self.update_beetle_queue.put(("p2_gun", update["p2"]["bullets"]))
 
-        self.game_state.player_1.initialize_from_dict(update["p1"])
-        self.game_state.player_2.initialize_from_dict(update["p2"])
+        if update["p1"]["hp"] != player_1.hp:
+            self.update_beetle_queue.put(("p1_vest", update["p1"]["hp"]))
+        if update["p2"]["hp"] != player_2.hp:
+            self.update_beetle_queue.put(("p2_vest", update["p2"]["hp"]))
+
+        player_1.initialize_from_dict(update["p1"])
+        player_2.initialize_from_dict(update["p2"])
 
     def reset_turn(self):
         # print("Resetting")
@@ -90,10 +93,17 @@ class GameEngine:
         self.turn_time_left = max(self.turn_end_time - time.time(), 0)
         return self.turn_time_left <= 0
 
+    def is_logged_out(self):
+        return (
+            self.game_state.p1.action == Actions.logout
+            or self.game_state.p2.action == Actions.logout
+        )
+
     def run(self):
         self.reset_turn()
+        game_start = True
 
-        while True:
+        while game_start:
             if self.is_turn_over():
                 self.reset_turn()
                 continue
@@ -102,8 +112,17 @@ class GameEngine:
                 continue
 
             player, action = self.action_queue.get()
-            print(player, action)
             opp = self.get_opp(player)
+            print(player, action)
+
+            # If new connection, action will be 'conn_<sensor>'
+            conn_list = action.split("_", 1)
+            if conn_list[0] == "conn":
+                sensor = conn_list[1]
+                data = getattr(self.game_state, player)[SENSOR_MAPPING[sensor]]
+                print(data)
+                self.update_beetle_queue.put((player + "_" + sensor, data))
+                continue
 
             if action in Actions.all:
                 self.signals[player]["action"] = action
@@ -132,8 +151,8 @@ class GameEngine:
                     opp_blasted_p1 = self.opp_in_frames[0]
                     opp_blasted_p2 = self.opp_in_frames[1]
 
-                player_1 = self.game_state.player_1
-                player_2 = self.game_state.player_2
+                player_1 = self.game_state.p1
+                player_2 = self.game_state.p2
 
                 action_p1_is_valid = player_1.action_is_valid(
                     action_p1, opp_hit_p1, opp_blasted_p1
@@ -145,17 +164,21 @@ class GameEngine:
                 player_1.update(action_p1, action_p2, action_p2_is_valid)
                 player_2.update(action_p2, action_p1, action_p1_is_valid)
 
-                init_game_state = self.game_state.get_dict()
-                print("[Game State Sent]:\n" + json.dumps(init_game_state, indent=4))
+                game_state = self.game_state.get_dict()
+                print("[Game State Sent]:\n" + json.dumps(game_state, indent=4))
 
-                self.eval_req_queue.put(init_game_state)
-
+                self.eval_req_queue.put(game_state)
                 updated_game_state = self.eval_resp_queue.get()
+
                 self.update_players(updated_game_state)
                 print(
                     "[Game State Updated]:\n"
                     + json.dumps(self.game_state.get_dict(), indent=4)
                 )
+
                 self.vis_queue.put(updated_game_state)
+
+                if self.is_logged_out():
+                    game_start = False
 
                 self.reset_turn()
