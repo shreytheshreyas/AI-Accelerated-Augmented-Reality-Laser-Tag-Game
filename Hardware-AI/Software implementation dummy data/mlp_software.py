@@ -143,6 +143,8 @@ if __name__ == '__main__':
         predictions.append(yhat)
         predictions_raw.append(yhat_raw)
         actuals.append(actual)
+        if i == 1919:
+            print(yhat_raw)
 
     print(x_test.numpy())
     print(yhat_raw)
