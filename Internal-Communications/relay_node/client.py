@@ -1,4 +1,5 @@
 import socket
+from types import NoneType
 
 from sshtunnel import open_tunnel
 
@@ -17,32 +18,38 @@ class LaptopClient:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_name = server_name
         self.server_port = server_port
+        self.ssh_tunnel = None
+        self.server_tunnel = None
 
     def connect(self):
-        ssh_tunnel = open_tunnel(
+        self.ssh_tunnel = open_tunnel(
             ("stu.comp.nus.edu", 22),
             ssh_username="kaijiel",
             remote_bind_address=(self.server_name, 22),
             block_on_close=False,
         )
-        ssh_tunnel.start()
+        self.ssh_tunnel.start()
         print("Set up tunnel to Ultra96")
 
-        server_tunnel = open_tunnel(
-            ssh_address_or_host=("127.0.0.1", ssh_tunnel.local_bind_port),
+        self.server_tunnel = open_tunnel(
+            ssh_address_or_host=("127.0.0.1", self.ssh_tunnel.local_bind_port),
             remote_bind_address=("127.0.0.1", self.server_port),
             # ssh_password="xilinxB13capstone",
             ssh_password="xilinx",
             ssh_username="xilinx",
             block_on_close=False,
         )
-        server_tunnel.start()
+        self.server_tunnel.start()
         print("Set up tunnel to Server on Ultra96")
 
-        self.socket.connect(("localhost", server_tunnel.local_bind_port))
+        self.socket.connect(("localhost", self.server_tunnel.local_bind_port))
         print("Connected to server on Ultra96")
 
     def close(self):
+        self.ssh_tunnel.stop()
+        self.server_tunnel.stop()
+        self.ssh_tunnel = None
+        self.server_tunnel = None
         self.socket.close()
 
     def recv_msg(self):

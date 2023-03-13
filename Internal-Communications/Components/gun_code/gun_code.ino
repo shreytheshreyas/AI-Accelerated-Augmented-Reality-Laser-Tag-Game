@@ -1,3 +1,6 @@
+#include <IRremote.hpp>
+#include "pitches.h"
+
 //Defining important constants
 #define PACKET_SIZE 20
 #define SENSOR_DATA 20
@@ -13,9 +16,30 @@
 #define RST_ACK 'r'
 #define FIN 'F'
 
+#define DECODE_NEC
+
+const int buttonPin = 2;    // Button at pin D2
+const int IR_SEND_PIN = 3;  // IR transmitter at pin D3
+const int buzzerPin = 5;    //buzzer at pin D5
+int buttonState = 0;
+
+const uint16_t PLAYER_1_ADDRESS = 0x0102;
+const uint16_t PLAYER_2_ADDRESS = 0x0105;
+const uint8_t command = 0x01; //1 for player 1
+
+uint8_t ammoStatus = 0;
+uint8_t repeats = 1;
+uint8_t bulletCount = 6;
+unsigned long sensorDelayStartTime = 0;
+byte sendDataPacket = false;
+
+// Test Timings
+unsigned long testCurr;
+unsigned long testPrev;
+
 //Class definition for protocol
 class Protocol {
-  private:
+private:
     int sensorDataIdx;
     int sequenceNumber;
     int previousTime;
@@ -23,119 +47,224 @@ class Protocol {
     int sensorData[SENSOR_DATA];
     byte packet[PACKET_SIZE];
 
-  public:
+public:
     Protocol();
     int calculate_checksum(void);
     void clear_serial_buffer(void);
     void get_sensor_data(void);
-    void initialize_packet_data(void);
+    void initialize_packet_data(int16_t);
     void start_communication(void);
 };
 
-//global variable declarations 
+//global variable declarations
 bool hasHandshakeStarted;
 bool hasHandshakeEnded;
 Protocol* communicationProtocol;
 
 
-//function definitions 
+//function definitions
 Protocol::Protocol() {
-  this->sensorDataIdx = 0; 
-  this->sequenceNumber = 0;
-  this->previousTime = 0;
-  this->currentTime = 0;
-  
-  for(int idx = 0; idx < SENSOR_DATA; idx++)
-    this->sensorData[idx] = 10 + idx; //In acutal implementation will change to 0
+    this->sensorDataIdx = 0;
+    this->sequenceNumber = 0;
+    this->previousTime = 0;
+    this->currentTime = 0;
 
-  for(int idx = 0; idx < PACKET_SIZE; idx++)
-    this->packet[idx] = 0;
+    for(int idx = 0; idx < SENSOR_DATA; idx++)
+        this->sensorData[idx] = 10 + idx; //In acutal implementation will change to 0
+
+    for(int idx = 0; idx < PACKET_SIZE; idx++)
+        this->packet[idx] = 0;
 }
 
 int Protocol::calculate_checksum(void) {
-  uint8_t checksum = 0;
-  
-  for(int idx = 0; idx < PACKET_SIZE-1; idx++)
-    checksum ^= this->packet[idx];
+    uint8_t checksum = 0;
 
-  return checksum;
+    for(int idx = 0; idx < 5; idx++)
+        checksum ^= this->packet[idx];
+
+    return checksum;
 }
 
 void Protocol::clear_serial_buffer() {
-  while(Serial.available()) 
-    byte dummy = Serial.read();
+    while(Serial.available())
+        byte dummy = Serial.read();
 }
 
 void Protocol::get_sensor_data() {
-  return;
+    return;
 }
 
-void Protocol::initialize_packet_data() {
-  this->packet[0] = this->sequenceNumber;
-  this->packet[1] = GUN_DATA;
-  this->packet[2] = this->sensorData[sensorDataIdx];
-  this->packet[PACKET_SIZE - 1] = this->calculate_checksum(); 
+void Protocol::initialize_packet_data(int16_t buttonStateData) {
+    this->packet[0] = this->sequenceNumber;
+    this->packet[1] = GUN_DATA;
+    this->packet[2] = ammoStatus;
+    this->packet[4] = this->sensorData[sensorDataIdx];
+    this->packet[PACKET_SIZE - 1] = this->calculate_checksum();
 }
 
 void Protocol::start_communication() {
-   currentTime = millis();
+    this->currentTime = millis();
 
-//    if (!Serial.available())
-//      return;
-      
+
     byte receivedData = Serial.read();
 
     switch(receivedData) {
-      case SYNC: 
-                 hasHandshakeStarted = true;
-                 hasHandshakeEnded = false;
-                 Serial.write(ACK);
-                 break;
+    case SYNC:
+        hasHandshakeStarted = true;
+        hasHandshakeEnded = false;
+        Serial.write(ACK);
+        break;
 
-      case ACK: 
-                hasHandshakeStarted = false;
-                hasHandshakeEnded = true;
-                break;
+    case ACK:
+        hasHandshakeStarted = false;
+        hasHandshakeEnded = true;
+        break;
 
-      case DATA_ACK: 
-                this->sequenceNumber++;
-                this->sensorDataIdx = (this->sensorDataIdx + 1) % 20;
-                
-                break;
+    case DATA_ACK:
+        this->sequenceNumber++;
+        break;
 
-      case DATA_NACK:
-                //Some code to handle this scenario
-                break;
-                
-      case RST: hasHandshakeStarted = false;
-                hasHandshakeEnded = false;
+    case DATA_NACK:
+        //Some code to handle this scenario
+        break;
+
+    case RST:
+        hasHandshakeStarted = false;
+        hasHandshakeEnded = false;
 //                this->clear_serial_buffer();
-                Serial.write(RST);
-                break;
+        Serial.write(RST);
+        break;
 
-      case FIN: 
-                //Some code to handle this scenario
-                break;
+    case FIN:
+        //Some code to handle this scenario
+        break;
     }
 
-  if ( (hasHandshakeEnded) && (currentTime -  previousTime > TIMEOUT) &&  receivedData != ACK) { 
-    Serial.write((byte*)&packet, sizeof(packet));
-    previousTime = currentTime;
-  }
+    if ( (hasHandshakeEnded) && (currentTime -  previousTime > TIMEOUT) &&  receivedData != ACK && sendDataPacket) {
+        Serial.write((byte*)&packet, sizeof(packet));
+        sendDataPacket = false;
+        this->previousTime = this->currentTime;
+    }
 
-  this->clear_serial_buffer();
+    this->clear_serial_buffer();
 }
 
+void sensorDelay(long interval) {
+    unsigned long currentMillis = millis();
+
+    while(currentMillis - sensorDelayStartTime < interval)
+        currentMillis = millis();
+
+}
+
+void outOfAmmoTune() {
+    tone(buzzerPin,NOTE_D1,100);
+    sensorDelayStartTime = millis();
+    sensorDelay(100); //replace with custom delay
+    tone(buzzerPin,NOTE_E1,100);
+}
+
+
 void setup() {
-  Serial.begin(DATA_RATE);
-  hasHandshakeStarted = false;
-  hasHandshakeEnded = false;
-  communicationProtocol = new Protocol();
+    Serial.begin(DATA_RATE);
+    pinMode(buttonPin, INPUT_PULLUP);
+    pinMode(buzzerPin, OUTPUT);
+    IrSender.begin(IR_SEND_PIN);  //start sending pin
+    hasHandshakeStarted = false;
+    hasHandshakeEnded = false;
+    communicationProtocol = new Protocol();
+
+    // Test
+    testPrev = millis();
 }
 
 void loop() {
 //  Serial.flush();
-  communicationProtocol->initialize_packet_data();
-  communicationProtocol->start_communication();
+    if (Serial.available()) {
+        int newBulletCount = Serial.readString().toInt();
+        if (bulletCount != newBulletCount) {
+            bulletCount = newBulletCount;
+        }
+    }
+
+
+    /* // Testing shot every 10s */
+    /* if (buttonState == 0) { */
+    /*     buttonState = 1; */
+    /* } */
+    /* testCurr = millis(); */
+    /* if ((testCurr - testPrev)>= 10 * 1000) { */
+    /*     testPrev = millis(); */
+    /*     testCurr = 0; */
+    /* } */
+    buttonState = digitalRead(buttonPin);
+//  Serial.println(buttonState);
+
+    if (buttonState == 0) {
+        sendDataPacket = true;
+        ammoStatus = 1;
+
+        switch (bulletCount) {
+        case 6:
+            tone(buzzerPin,NOTE_C6,100);
+            bulletCount -= 1;
+            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+            sensorDelayStartTime = millis();
+            sensorDelay(500);
+            break;
+
+        case 5:
+            tone(buzzerPin,NOTE_D6,100);
+            bulletCount -= 1;
+            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+            sensorDelayStartTime = millis();
+            sensorDelay(500);
+            break;
+
+        case 4:
+            tone(buzzerPin,NOTE_E6,100);
+            bulletCount -= 1;
+            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+            sensorDelayStartTime = millis();
+            sensorDelay(500);
+            break;
+
+        case 3:
+            tone(buzzerPin,NOTE_F6,100);
+            bulletCount -= 1;
+            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+            sensorDelayStartTime = millis();
+            sensorDelay(500);
+            break;
+
+        case 2:
+            tone(buzzerPin,NOTE_G6,100);
+            bulletCount -= 1;
+            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+            sensorDelayStartTime = millis();
+            sensorDelay(500);
+            break;
+
+        case 1:
+            tone(buzzerPin,NOTE_A6,100);
+//      Serial.println("signal has been sent");
+//      Serial.println(buttonState);
+            bulletCount -= 1;
+            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+            sensorDelayStartTime = millis();
+            sensorDelay(500);
+            break;
+
+        case 0:
+            outOfAmmoTune();
+            ammoStatus = 13;
+            sensorDelayStartTime = millis();
+            sensorDelay(500);
+            break;
+        }
+    }
+
+    communicationProtocol->initialize_packet_data(buttonState);
+    communicationProtocol->start_communication();
 //  communicationProtocol->clear_serial_buffer();
 }
