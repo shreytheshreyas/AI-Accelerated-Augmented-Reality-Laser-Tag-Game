@@ -4,6 +4,8 @@ import time
 from GameState import GameState
 from Helper import Actions
 
+TWO_PLAYER = False
+
 TURN_MAX_TIME = 3
 
 SENSOR_MAPPING = {"gun": "bullets", "vest": "hp"}
@@ -33,6 +35,7 @@ class GameEngine:
         self.reset_turn()
 
     def update_players(self, update):
+        print("Updateing Players")
         player_1 = self.game_state.p1
         player_2 = self.game_state.p2
 
@@ -57,12 +60,12 @@ class GameEngine:
 
         self.signals = {
             "p1": {
-                "action": None,
+                "action": Actions.no,
                 "opp_hit": False,
                 "opp_blasted": False,
             },
             "p2": {
-                "action": None,
+                "action": Actions.no,
                 "opp_hit": False,
                 "opp_blasted": False,
             },
@@ -86,7 +89,10 @@ class GameEngine:
         return "p1" if player == "p2" else "p2"
 
     def is_complete(self):
-        return self.complete["p1"] or self.complete["p2"]
+        if TWO_PLAYER:
+            return self.complete["p1"] or self.complete["p2"]
+
+        return self.complete["p1"] and self.complete["p2"]
 
     def is_turn_over(self):
         print("Turn is over")
@@ -104,10 +110,6 @@ class GameEngine:
         game_start = True
 
         while game_start:
-            if self.is_turn_over():
-                self.reset_turn()
-                continue
-
             if not self.action_queue:
                 continue
 
@@ -119,9 +121,9 @@ class GameEngine:
             conn_list = action.split("_", 1)
             if conn_list[0] == "conn":
                 sensor = conn_list[1]
-                data = getattr(self.game_state, player)[SENSOR_MAPPING[sensor]]
-                print(data)
-                self.update_beetle_queue.put((player + "_" + sensor, data))
+                data = getattr(getattr(self.game_state, player), SENSOR_MAPPING[sensor])
+                print(SENSOR_MAPPING[sensor], "=", data)
+                self.update_beetle_queue.put((player + "_" + sensor, str(data)))
                 continue
 
             if action in Actions.all:
@@ -132,20 +134,15 @@ class GameEngine:
             self.check_turn("p1")
             self.check_turn("p2")
 
-            if self.is_complete():
-                print("Turn Complete")
-                if self.complete["p1"]:
-                    action_p1 = self.signals["p1"]["action"]
-                    opp_hit_p1 = self.signals["p1"]["opp_hit"]
-                else:
-                    action_p1 = Actions.no
-                    opp_hit_p1 = False
-                if self.complete["p2"]:
-                    action_p2 = self.signals["p2"]["action"]
-                    opp_hit_p2 = self.signals["p2"]["opp_hit"]
-                else:
-                    action_p2 = Actions.no
-                    opp_hit_p2 = False
+            if self.is_complete() or self.is_turn_over():
+                action_p1 = self.signals["p1"]["action"]
+                action_p2 = self.signals["p2"]["action"]
+
+                if action_p1 == Actions.no and action_p2 == Actions.no:
+                    continue
+
+                opp_hit_p1 = self.signals["p1"]["opp_hit"]
+                opp_hit_p2 = self.signals["p2"]["opp_hit"]
 
                 with self.opp_in_frames.get_lock():
                     opp_blasted_p1 = self.opp_in_frames[0]

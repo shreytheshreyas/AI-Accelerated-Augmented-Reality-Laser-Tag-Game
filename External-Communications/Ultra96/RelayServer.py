@@ -1,8 +1,9 @@
 import json
 import multiprocessing as mp
 import socket
+import time
 
-from HWAccel import HWAccel
+# from HWAccel import HWAccel
 from HWAccel_Stub import HWAccel_Stub
 from Test import get_queue
 
@@ -91,13 +92,19 @@ class RelayServer:
         }
 
         while True:
-            if edit_conn_queue:
+            if not edit_conn_queue.empty():
                 component, conn = edit_conn_queue.get()
                 conns[component] = conn
 
-            if update_beetle_queue:
+                print(conns)
+
+            if not update_beetle_queue.empty():
                 component, data = update_beetle_queue.get()
-                self.send_plaintext(str(data), conns[component])
+                if conns[component]:
+                    print(f"Sending data [{data}] to {component}")
+                    self.send_plaintext(str(data), conns[component])
+                else:
+                    print(f"Could not send data [{data}] to {component}")
 
     def handle_gun_conn(self, conn, action_queue, edit_conn_queue, player, component):
         while True:
@@ -164,8 +171,6 @@ class RelayServer:
         player = data["player"]
         component = player + "_" + sensor
 
-        self.action_queue.put((player, "conn_" + sensor))
-
         with self.connected.get_lock():
             id = COMPONENT_IDS[component]
             if self.connected[id]:
@@ -175,6 +180,10 @@ class RelayServer:
 
             self.connected[id] = True
             self.send_plaintext(f"Server connection for {component} accepted", conn)
+
+        self.edit_conn_queue.put((component, conn))
+        time.sleep(0.1)
+        self.action_queue.put((player, "conn_" + sensor))
 
         return player, sensor
 
@@ -201,7 +210,6 @@ class RelayServer:
                 continue
             component = player + "_" + sensor
             print(f"Connected to {component}")
-            self.edit_conn_queue.put((component, conn))
 
             if sensor == "gun":
                 p = mp.Process(

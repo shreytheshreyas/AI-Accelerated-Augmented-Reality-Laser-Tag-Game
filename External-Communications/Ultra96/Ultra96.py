@@ -68,9 +68,6 @@ class Ultra96:
             relay_server_process.start()
             engine_process.start()
             mqtt_process.start()
-            _ = input(
-                "Ensure that components are connected then click enter to start evaluation"
-            )
             eval_process.start()
 
             eval_process.join()
