@@ -15,18 +15,20 @@ Your choice: """
 # Communicates with eval_server
 class LaptopClient:
     def __init__(self, server_name, server_port):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_name = server_name
         self.server_port = server_port
+        self.socket = None
         self.ssh_tunnel = None
         self.server_tunnel = None
 
     def connect(self):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.settimeout(1)
+
         self.ssh_tunnel = open_tunnel(
             ("stu.comp.nus.edu", 22),
             ssh_username="kaijiel",
             remote_bind_address=(self.server_name, 22),
-            block_on_close=False,
         )
         self.ssh_tunnel.start()
         print("Set up tunnel to Ultra96")
@@ -37,26 +39,34 @@ class LaptopClient:
             # ssh_password="xilinxB13capstone",
             ssh_password="xilinx",
             ssh_username="xilinx",
-            block_on_close=False,
         )
         self.server_tunnel.start()
         print("Set up tunnel to Server on Ultra96")
 
+        # print("local bind port =", self.server_tunnel.local_bind_port)
         self.socket.connect(("localhost", self.server_tunnel.local_bind_port))
         print("Connected to server on Ultra96")
 
     def close(self):
-        self.ssh_tunnel.stop()
-        self.server_tunnel.stop()
+        self.server_tunnel.close()
+        self.ssh_tunnel.close()
         self.ssh_tunnel = None
         self.server_tunnel = None
         self.socket.close()
+        self.socket = None
 
-    def recv_msg(self):
+    def available(self):
+        try:
+            _d = self.socket.recv(1)
+            return True, _d
+        except socket.timeout:
+            return False, ""
+
+    def recv_msg(self, d):
         msg = None
         try:
             # recv length followed by '_' followed by cypher
-            data = b""
+            data = d
             while not data.endswith(b"_"):
                 _d = self.socket.recv(1)
                 if not _d:
@@ -120,7 +130,7 @@ class LaptopClient:
             print("Sending", send_json)
             self.send_plaintext(send_json)
 
-        receivedMsg = self.recv_msg()
+        receivedMsg = self.recv_msg("")
         if not receivedMsg:
             return
 
@@ -139,7 +149,9 @@ class LaptopClient:
             print("Sending", action)
             self.send_plaintext(action)
 
-            receivedMsg = self.recv_msg()
+            avail, first = self.laptopClient.available()
+            if avail:
+                self.laptopClient.recv_msg(first)
             if not receivedMsg:
                 break
 

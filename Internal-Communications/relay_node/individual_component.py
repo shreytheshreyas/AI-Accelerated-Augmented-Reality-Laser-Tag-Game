@@ -18,6 +18,8 @@ from bluepy.btle import (
 )
 from client import LaptopClient
 
+CHARACTERISTIC = "0000dfb1-0000-1000-8000-00805f9b34fb"
+
 # Respond Message Buffer size
 NUM_OF_BEETLES = 9  # Need to update to 6 to accomodate two players
 DATA_BUFFER_SIZE = 20
@@ -56,15 +58,15 @@ PLAYER_JSON_DATA = [
 ]
 
 MAC_ADDRESSES = {
-        0: '',
-        1: 'D0:39:72:BF:C3:8F',
-        2: 'D0:39:72:BF:CA:D4',
-        3: 'D0:39:72:BF:CD:20',
-        4: 'D0:39:72:BF:CD:0A',
-        5: 'D0:39:72:BF:C8:D8',
-        6: 'D0:39:72:BF:C8:89',
-        7: 'D0:39:72:BF:C8:D7',
-        8: '6C:79:B8:D3:6A:A3'
+    0: "D0:39:72:BF:CD:20",
+    1: "D0:39:72:BF:C3:8F",
+    2: "D0:39:72:BF:CA:D4",
+    3: "",
+    4: "D0:39:72:BF:CD:0A",
+    5: "D0:39:72:BF:C8:D8",
+    6: "D0:39:72:BF:C8:89",
+    7: "D0:39:72:BF:C8:D7",
+    8: "6C:79:B8:D3:6A:A3",
 }
 
 
@@ -502,23 +504,28 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                     packetType = struct.unpack("b", packetData[1:2])[0]
                     if chr(packetType) == GUN:
                         gunData = struct.unpack("B", packetData[2:3])[0]
+                        # print("gun data", gunData)
 
-                        if gunData == 1:
-                            print("Ammo decreased by one count")
-
-                        if gunData == 13:
+                        if gunData > 0:
+                            print(f"Ammo before shot is {gunData}")
+                        else:
                             print("Gun is out of ammo")
+                        # Shoot either ways
+                        self.laptopClient.send_plaintext("shoot")
 
                         StatisticsManager.set_beetle_statistics(self.beetleId, data)
 
                     if chr(packetType) == VEST:
                         vestData = struct.unpack("B", packetData[2:3])[0]
                         print(f"vest data received = {vestData}")
-                        if vestData == 1:
-                            print("Player health decreased by 10HP")
 
-                        if vestData == 13:
+                        if vestData > 0:
+                            print(f"Player health {vestData}")
+                        else:
+                            # Should not be the case
                             print("Player is dead")
+                        # Send hit either ways
+                        self.laptopClient.send_plaintext("hit")
 
                         StatisticsManager.set_beetle_statistics(self.beetleId, data)
 
@@ -544,10 +551,12 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                             struct.unpack(">h", packetData[12:14])[0] / 128
                         )
                         # imuDataFeatureVector['label'] = 'grenade'
-                        imuDataFeatureVector["label"] = "shield"
+                        # imuDataFeatureVector["label"] = "shield"
                         # imuDataFeatureVector['label'] = 'reload'
                         # print(packetData)
                         print(imuDataFeatureVector)
+                        data_json = json.dumps(imuDataFeatureVector)
+                        self.laptopClient.send_plaintext(data_json)
                     StatusManager.set_data_ack_status(self.beetleId)
 
                 # else:
@@ -573,12 +582,13 @@ class BlunoDevice:
         self.macAddress = macAddress
         self.peripheral = None
         self.blutoothInterfaceHandler = None
-        self.laptopClient = LaptopClient("192.168.95.250", 8080)
+        self.laptopClient = LaptopClient("192.168.95.250", 8081)
         self.connectedToUltra = False
 
     def transmit_packet(self, data):
         try:
             for characteristic in self.peripheral.getCharacteristics():
+                # if characteristic.uuid == CHARACTERISTI:
                 characteristic.write(bytes(data, "ascii"), withResponse=False)
         except (BTLEDisconnectError, AttributeError):
             pass
@@ -590,7 +600,12 @@ class BlunoDevice:
     def connect_to_ultra96(self):
         self.laptopClient.connect()
         self.laptopClient.send_plaintext(PLAYER_JSON_DATA[self.beetleId])
-        receivedMessage = self.laptopClient.recv_msg()
+        receivedMessage = ""
+        avail = False
+        while not avail:
+            avail, first = self.laptopClient.available()
+
+        receivedMessage = self.laptopClient.recv_msg(first)
         logging.info(
             f"Connection successfully established between relay node and ultra-96 - {receivedMessage}"
         )
@@ -664,18 +679,26 @@ class BlunoDevice:
                     if isHandshakeCompleted:
                         self.connect_to_ultra96()
                 else:
+                    avail, first = self.laptopClient.available()
+                    if avail:
+                        print("Data from relay node availble")
+                        data = self.laptopClient.recv_msg(first)
+                        print(f"Sending data [{data}] to component")
+                        self.transmit_packet(data)
+                        print("Data sent to component")
+
                     # regular data transfer
                     # StatisticsManager.display_statistics()
                     self.peripheral.waitForNotifications(0.1)
 
-                    if StatusManager.get_data_ack_status(self.beetleId):
-                        # self.laptopClient.send_plaintext(BufferManager.relayNodeBuffer.get())
-                        self.transmit_packet(DATA_ACK)
-                        StatusManager.clear_data_ack_status(self.beetleId)
-
-                    if StatusManager.get_data_nack_status(self.beetleId):
-                        self.transmit_packet(DATA_NACK)
-                        StatusManager.clear_data_nack_status(self.beetleId)
+                    # if StatusManager.get_data_ack_status(self.beetleId):
+                    #     # self.laptopClient.send_plaintext(BufferManager.relayNodeBuffer.get())
+                    #     self.transmit_packet(DATA_ACK)
+                    #     StatusManager.clear_data_ack_status(self.beetleId)
+                    #
+                    # if StatusManager.get_data_nack_status(self.beetleId):
+                    #     self.transmit_packet(DATA_NACK)
+                    #     StatusManager.clear_data_nack_status(self.beetleId)
 
             except KeyboardInterrupt:
                 logging("Program terminated due a keyboard interrupt")
@@ -723,10 +746,10 @@ if __name__ == "__main__":
 
     # Instantiation of Threads
     logging.info("Instantiation of threads")
-    # beetleThread0 = threading.Thread(target=beetle0.transmission_protocol, args=())
+    beetleThread0 = threading.Thread(target=beetle0.transmission_protocol, args=())
     beetleThread1 = threading.Thread(target=beetle1.transmission_protocol, args=())
     beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
-    beetleThread3 = threading.Thread(target=beetle3.transmission_protocol, args=())
+    # beetleThread3 = threading.Thread(target=beetle3.transmission_protocol, args=())
     beetleThread4 = threading.Thread(target=beetle4.transmission_protocol, args=())
     beetleThread5 = threading.Thread(target=beetle5.transmission_protocol, args=())
     beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
@@ -734,10 +757,10 @@ if __name__ == "__main__":
     beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
 
     # Starting beetle Threads
-    # beetleThread0.start()
+    beetleThread0.start()
     # beetleThread1.start()
     # beetleThread2.start()
-    beetleThread3.start()
+    # beetleThread3.start()
     # beetleThread4.start()
     # beetleThread5.start()
     # beetleThread6.start()
@@ -745,10 +768,10 @@ if __name__ == "__main__":
     # beetleThread8.start()
 
     # Terminating beetle Threads
-    # beetleThread0.join()
+    beetleThread0.join()
     # beetleThread1.join()
     # beetleThread2.join()
-    beetleThread3.join()
+    # beetleThread3.join()
     # beetleThread4.join()
     # beetleThread5.join()
     # beetleThread6.join()

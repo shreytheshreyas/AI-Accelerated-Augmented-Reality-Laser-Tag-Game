@@ -29,7 +29,7 @@ const uint8_t command = 0x01; //1 for player 1
 
 uint8_t ammoStatus = 0;
 uint8_t repeats = 1;
-uint8_t bulletCount = 6;
+uint8_t bulletCount = 0;
 unsigned long sensorDelayStartTime = 0;
 byte sendDataPacket = false;
 
@@ -54,6 +54,7 @@ public:
     void get_sensor_data(void);
     void initialize_packet_data(int16_t);
     void start_communication(void);
+    void send_data(void);
 };
 
 //global variable declarations
@@ -97,14 +98,12 @@ void Protocol::get_sensor_data() {
 void Protocol::initialize_packet_data(int16_t buttonStateData) {
     this->packet[0] = this->sequenceNumber;
     this->packet[1] = GUN_DATA;
-    this->packet[2] = ammoStatus;
+    this->packet[2] = bulletCount;
     this->packet[4] = this->sensorData[sensorDataIdx];
     this->packet[PACKET_SIZE - 1] = this->calculate_checksum();
 }
 
 void Protocol::start_communication() {
-    this->currentTime = millis();
-
 
     byte receivedData = Serial.read();
 
@@ -139,14 +138,19 @@ void Protocol::start_communication() {
         //Some code to handle this scenario
         break;
     }
+}
 
-    if ( (hasHandshakeEnded) && (currentTime -  previousTime > TIMEOUT) &&  receivedData != ACK && sendDataPacket) {
+void Protocol::send_data() {
+    this->currentTime = millis();
+    if ( (hasHandshakeEnded) && (this->currentTime -  this->previousTime > TIMEOUT) && sendDataPacket) {
         Serial.write((byte*)&packet, sizeof(packet));
         sendDataPacket = false;
         this->previousTime = this->currentTime;
     }
-
-    this->clear_serial_buffer();
+    /* byte dataAck = Serial.read(); */
+    /* if (dataAck != ACK) { */
+    /*     // Do something here */
+    /* } */
 }
 
 void sensorDelay(long interval) {
@@ -173,98 +177,60 @@ void setup() {
     hasHandshakeStarted = false;
     hasHandshakeEnded = false;
     communicationProtocol = new Protocol();
-
-    // Test
-    testPrev = millis();
 }
 
 void loop() {
-//  Serial.flush();
+    if (!hasHandshakeEnded) {
+        communicationProtocol->start_communication();
+    }
+
     if (Serial.available()) {
+        sensorDelayStartTime = millis();
+        sensorDelay(50);
         int newBulletCount = Serial.readString().toInt();
         if (bulletCount != newBulletCount) {
             bulletCount = newBulletCount;
+            tone(buzzerPin,NOTE_C6,100);
         }
     }
 
-
-    /* // Testing shot every 10s */
-    /* if (buttonState == 0) { */
-    /*     buttonState = 1; */
-    /* } */
-    /* testCurr = millis(); */
-    /* if ((testCurr - testPrev)>= 10 * 1000) { */
-    /*     testPrev = millis(); */
-    /*     testCurr = 0; */
-    /* } */
     buttonState = digitalRead(buttonPin);
-//  Serial.println(buttonState);
 
     if (buttonState == 0) {
         sendDataPacket = true;
         ammoStatus = 1;
 
-        switch (bulletCount) {
-        case 6:
+        if (bulletCount == 6) {
             tone(buzzerPin,NOTE_C6,100);
-            bulletCount -= 1;
-            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
-            sensorDelayStartTime = millis();
-            sensorDelay(500);
-            break;
-
-        case 5:
+        } else if (bulletCount == 5) {
             tone(buzzerPin,NOTE_D6,100);
-            bulletCount -= 1;
-            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
-            sensorDelayStartTime = millis();
-            sensorDelay(500);
-            break;
-
-        case 4:
+        } else if (bulletCount == 4) {
             tone(buzzerPin,NOTE_E6,100);
-            bulletCount -= 1;
-            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
-            sensorDelayStartTime = millis();
-            sensorDelay(500);
-            break;
-
-        case 3:
+        } else if (bulletCount == 3) {
             tone(buzzerPin,NOTE_F6,100);
-            bulletCount -= 1;
-            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
-            sensorDelayStartTime = millis();
-            sensorDelay(500);
-            break;
-
-        case 2:
+        } else if (bulletCount == 2) {
             tone(buzzerPin,NOTE_G6,100);
-            bulletCount -= 1;
-            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
-            sensorDelayStartTime = millis();
-            sensorDelay(500);
-            break;
-
-        case 1:
+        } else if (bulletCount == 1) {
             tone(buzzerPin,NOTE_A6,100);
-//      Serial.println("signal has been sent");
-//      Serial.println(buttonState);
-            bulletCount -= 1;
-            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
-            sensorDelayStartTime = millis();
-            sensorDelay(500);
-            break;
+        }
 
-        case 0:
+        if (bulletCount > 0) {
+            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+        } else {
             outOfAmmoTune();
             ammoStatus = 13;
-            sensorDelayStartTime = millis();
-            sensorDelay(500);
-            break;
+
         }
+        communicationProtocol->initialize_packet_data(buttonState);
+        communicationProtocol->send_data();
+
+        if (bulletCount > 0) {
+            bulletCount -= 1;
+        }
+
+        sensorDelayStartTime = millis();
+        sensorDelay(500);
     }
 
-    communicationProtocol->initialize_packet_data(buttonState);
-    communicationProtocol->start_communication();
 //  communicationProtocol->clear_serial_buffer();
 }

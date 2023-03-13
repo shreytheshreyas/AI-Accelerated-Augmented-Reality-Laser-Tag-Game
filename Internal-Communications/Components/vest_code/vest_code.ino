@@ -72,6 +72,7 @@ public:
     void get_sensor_data(void);
     void initialize_packet_data(void);
     void start_communication(void);
+    void send_data(void);
 };
 
 //global variable declarations
@@ -115,15 +116,11 @@ void Protocol::get_sensor_data() {
 void Protocol::initialize_packet_data() {
     this->packet[0] = this->sequenceNumber;
     this->packet[1] = VEST_DATA;
-    this->packet[2] = lifeStatus;
+    this->packet[2] = health;
     this->packet[PACKET_SIZE - 1] = this->calculate_checksum();
 }
 
 void Protocol::start_communication() {
-    currentTime = millis();
-
-//    if (!Serial.available())
-//      return;
 
     byte receivedData = Serial.read();
 
@@ -141,8 +138,6 @@ void Protocol::start_communication() {
 
     case DATA_ACK:
         this->sequenceNumber++;
-        this->sensorDataIdx = (this->sensorDataIdx + 1) % 20;
-
         break;
 
     case DATA_NACK:
@@ -160,16 +155,20 @@ void Protocol::start_communication() {
         //Some code to handle this scenario
         break;
     }
-
-    if ( (hasHandshakeEnded) && (currentTime -  previousTime > TIMEOUT) &&  receivedData != ACK && sendData) {
-        Serial.write((byte*)&packet, sizeof(packet));
-        sendData = false;
-        previousTime = currentTime;
-    }
-
-    this->clear_serial_buffer();
 }
 
+void Protocol::send_data() {
+    this->currentTime = millis();
+    if ( (hasHandshakeEnded) && (this->currentTime -  this->previousTime > TIMEOUT) && sendDataPacket) {
+        Serial.write((byte*)&packet, sizeof(packet));
+        sendDataPacket = false;
+        this->previousTime = this->currentTime;
+    }
+    /* byte dataAck = Serial.read(); */
+    /* if (dataAck != ACK) { */
+    /*     // Do something here */
+    /* } */
+}
 void sensorDelay(long interval) {
     unsigned long currentMillis = millis();
 
@@ -200,8 +199,20 @@ void setup() {
 }
 
 void loop() {
-//  Serial.flush();
     if (Serial.available()) {
+        int newHealth = Serial.readString().toInt();
+        if (health != newHealth) {
+            health = newHealth;
+        }
+    }
+
+    if (!hasHandshakeEnded) {
+        communicationProtocol->start_communication();
+    }
+
+    if (Serial.available()) {
+        sensorDelayStartTime = millis();
+        sensorDelay(50);
         int newHealth = Serial.readString().toInt();
         if (health != newHealth) {
             health = newHealth;
@@ -222,40 +233,19 @@ void loop() {
             sensorDelayStartTime = millis();
             sensorDelay(100);
 
+            communicationProtocol->initialize_packet_data();
+            communicationProtocol->send_data();
+
             if (health == 0) {
                 display.setSegments(DEAD);
                 deadTune();
                 sensorDelayStartTime = millis();
-                sensorDelay(100);
+                sensorDelay(1000);
                 health = 100;
                 display.showNumberDec(health);
             }
         }
+        IrReceiver.resume();
     }
 
-//      Serial.println("Received signal");  //debug
-
-    /* if (isShot == true && health == 0) { */
-    /*   lifeStatus = 13; */
-    /*   sendData = true; */
-    /*   display.setSegments(DEAD); */
-    /*   deadTune(); */
-    /*   health = 0; */
-    /* }  */
-    /* if (health == 0) { */
-    /*   display.setSegments(DEAD); */
-    /*   deadTune(); */
-    /*   sensorDelayStartTime = millis(); */
-    /*   sensorDelay(100); */
-    /*   health = 100; */
-    /*   display.showNumberDec(health); */
-    /* } */
-    /* else { */
-
-//    IrReceiver.begin(IR_RCV_PIN); //continue receiving IR signals
-    IrReceiver.resume();
-}
-communicationProtocol->initialize_packet_data();
-communicationProtocol->start_communication();
-//  communicationProtocol->clear_serial_buffer();
 }
