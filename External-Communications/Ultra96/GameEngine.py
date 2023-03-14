@@ -35,19 +35,16 @@ class GameEngine:
         self.reset_turn()
 
     def update_players(self, update):
-        print("Updateing Players")
         player_1 = self.game_state.p1
         player_2 = self.game_state.p2
 
-        if update["p1"]["bullets"] != player_1.bullets:
-            self.update_beetle_queue.put(("p1_gun", update["p1"]["bullets"]))
-        if update["p2"]["bullets"] != player_2.bullets:
-            self.update_beetle_queue.put(("p2_gun", update["p2"]["bullets"]))
+        print("Updating Gun and Vest")
 
-        if update["p1"]["hp"] != player_1.hp:
-            self.update_beetle_queue.put(("p1_vest", update["p1"]["hp"]))
-        if update["p2"]["hp"] != player_2.hp:
-            self.update_beetle_queue.put(("p2_vest", update["p2"]["hp"]))
+        self.update_beetle_queue.put(("p1_gun", update["p1"]["bullets"]))
+        self.update_beetle_queue.put(("p2_gun", update["p2"]["bullets"]))
+
+        self.update_beetle_queue.put(("p1_vest", update["p1"]["hp"]))
+        self.update_beetle_queue.put(("p2_vest", update["p2"]["hp"]))
 
         player_1.initialize_from_dict(update["p1"])
         player_2.initialize_from_dict(update["p2"])
@@ -162,16 +159,16 @@ class GameEngine:
                 player_2.update(action_p2, action_p1, action_p1_is_valid)
 
                 game_state = self.game_state.get_dict()
-                print("[Game State Sent]:\n" + json.dumps(game_state, indent=4))
 
+                # print("[Game State Sent]:\n" + json.dumps(game_state, indent=4))
                 self.eval_req_queue.put(game_state)
                 updated_game_state = self.eval_resp_queue.get()
 
                 self.update_players(updated_game_state)
-                print(
-                    "[Game State Updated]:\n"
-                    + json.dumps(self.game_state.get_dict(), indent=4)
-                )
+                # print(
+                #     "[Game State Updated]:\n"
+                #     + json.dumps(self.game_state.get_dict(), indent=4)
+                # )
 
                 self.vis_queue.put(updated_game_state)
 

@@ -3,7 +3,9 @@ import multiprocessing as mp
 import socket
 import time
 
-# from HWAccel import HWAccel
+from Helper import Actions
+
+from HWAccel import HWAccel
 from HWAccel_Stub import HWAccel_Stub
 from Test import get_queue
 
@@ -31,8 +33,8 @@ class RelayServer:
         self.update_beetle_queue = update_beetle_queue
 
         # TODO: Replace with actual HWAccel
-        self.ai = HWAccel_Stub()
-        # self.ai = HWAccel()
+        # self.ai = HWAccel_Stub()
+        self.ai = HWAccel()
 
     def recv_msg(self, conn):
         msg = None
@@ -145,9 +147,13 @@ class RelayServer:
             msg = self.recv_msg(conn)
             if not msg:
                 break
-            action = self.ai.get_action(msg)
 
-            action_queue.put((player, action))
+            data = json.loads(msg)
+
+            action = self.ai.get_action(list(data.values())[1:])
+
+            if action != Actions.no:
+                action_queue.put((player, action))
 
         conn.close()
         with self.connected.get_lock():
@@ -181,9 +187,10 @@ class RelayServer:
             self.connected[id] = True
             self.send_plaintext(f"Server connection for {component} accepted", conn)
 
-        self.edit_conn_queue.put((component, conn))
-        time.sleep(0.1)
-        self.action_queue.put((player, "conn_" + sensor))
+        if sensor == 'gun' or sensor == 'vest':
+            self.edit_conn_queue.put((component, conn))
+            time.sleep(0.1)
+            self.action_queue.put((player, "conn_" + sensor))
 
         return player, sensor
 
