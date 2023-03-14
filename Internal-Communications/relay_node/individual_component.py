@@ -59,11 +59,11 @@ PLAYER_JSON_DATA = [
 
 MAC_ADDRESSES = {
     0: "D0:39:72:BF:CD:20",
-    1: "D0:39:72:BF:C3:8F",
-    2: "D0:39:72:BF:CA:D4",
+    1: "D0:39:72:BF:CD:0A",
+    2: "D0:39:72:BF:C8:D8",
     3: "",
-    4: "D0:39:72:BF:CD:0A",
-    5: "D0:39:72:BF:C8:D8",
+    4: "D0:39:72:BF:C3:8F",
+    5: "D0:39:72:BF:CA:D4",
     6: "D0:39:72:BF:C8:89",
     7: "D0:39:72:BF:C8:D7",
     8: "6C:79:B8:D3:6A:A3",
@@ -554,7 +554,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         # imuDataFeatureVector["label"] = "shield"
                         # imuDataFeatureVector['label'] = 'reload'
                         # print(packetData)
-                        print(imuDataFeatureVector)
+                        # print(imuDataFeatureVector)
                         data_json = json.dumps(imuDataFeatureVector)
                         self.laptopClient.send_plaintext(data_json)
                     StatusManager.set_data_ack_status(self.beetleId)
@@ -659,7 +659,7 @@ class BlunoDevice:
         print("End of handshake protocol", isHandshakeCompleted)
         return isHandshakeCompleted
 
-    def transmission_protocol(self):
+    def transmission_protocol(self, isReceiver):
         isHandshakeCompleted = False
         while True:
             try:
@@ -679,17 +679,18 @@ class BlunoDevice:
                     if isHandshakeCompleted:
                         self.connect_to_ultra96()
                 else:
-                    avail, first = self.laptopClient.available()
-                    if avail:
-                        print("Data from relay node availble")
-                        data = self.laptopClient.recv_msg(first)
-                        print(f"Sending data [{data}] to component")
-                        self.transmit_packet(data)
-                        print("Data sent to component")
+                    if isReceiver:
+                        avail, first = self.laptopClient.available()
+                        if avail:
+                            print("Data from relay node availble")
+                            data = self.laptopClient.recv_msg(first)
+                            print(f"Sending data [{data}] to component")
+                            self.transmit_packet(data)
+                            print("Data sent to component")
 
                     # regular data transfer
                     # StatisticsManager.display_statistics()
-                    self.peripheral.waitForNotifications(0.1)
+                    self.peripheral.waitForNotifications(0.01)
 
                     # if StatusManager.get_data_ack_status(self.beetleId):
                     #     # self.laptopClient.send_plaintext(BufferManager.relayNodeBuffer.get())
@@ -746,34 +747,43 @@ if __name__ == "__main__":
 
     # Instantiation of Threads
     logging.info("Instantiation of threads")
-    beetleThread0 = threading.Thread(target=beetle0.transmission_protocol, args=())
-    beetleThread1 = threading.Thread(target=beetle1.transmission_protocol, args=())
-    beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
-    # beetleThread3 = threading.Thread(target=beetle3.transmission_protocol, args=())
-    beetleThread4 = threading.Thread(target=beetle4.transmission_protocol, args=())
-    beetleThread5 = threading.Thread(target=beetle5.transmission_protocol, args=())
-    beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
-    beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=())
-    beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
+    beetleThread0 = threading.Thread(target=beetle0.transmission_protocol, args=(True,))
+    beetleThread1 = threading.Thread(target=beetle1.transmission_protocol, args=(True,))
+    beetleThread2 = threading.Thread(
+        target=beetle2.transmission_protocol, args=(False,)
+    )
+    # beetleThread3 = threading.Thread(target=beetle3.transmission_protocol, args=(True,))
+    beetleThread4 = threading.Thread(target=beetle4.transmission_protocol, args=(True,))
+    beetleThread5 = threading.Thread(
+        target=beetle5.transmission_protocol, args=(False,)
+    )
+    beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=(True,))
+    beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=(True,))
+    beetleThread8 = threading.Thread(
+        target=beetle8.transmission_protocol, args=(False,)
+    )
 
-    # Starting beetle Threads
-    beetleThread0.start()
-    # beetleThread1.start()
-    # beetleThread2.start()
-    # beetleThread3.start()
-    # beetleThread4.start()
-    # beetleThread5.start()
-    # beetleThread6.start()
-    # beetleThread7.start()
-    # beetleThread8.start()
+    try:
+        # Starting beetle Threads
+        beetleThread0.start()
+        # beetleThread1.start()
+        # beetleThread2.start()
+        # beetleThread3.start()
+        beetleThread4.start()
+        # beetleThread5.start()
+        # beetleThread6.start()
+        # beetleThread7.start()
+        # beetleThread8.start()
 
-    # Terminating beetle Threads
-    beetleThread0.join()
-    # beetleThread1.join()
-    # beetleThread2.join()
-    # beetleThread3.join()
-    # beetleThread4.join()
-    # beetleThread5.join()
-    # beetleThread6.join()
-    # beetleThread7.join()
-    # beetleThread8.join()
+        # Terminating beetle Threads
+        beetleThread0.join()
+        # beetleThread1.join()
+        # beetleThread2.join()
+        # beetleThread3.join()
+        beetleThread4.join()
+        # beetleThread5.join()
+        # beetleThread6.join()
+        # beetleThread7.join()
+        # beetleThread8.join()
+    except KeyboardInterrupt:
+        exit()

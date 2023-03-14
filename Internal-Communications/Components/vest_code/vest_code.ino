@@ -14,6 +14,9 @@
 #define SENSOR_DATA 20
 #define DATA_RATE 115200
 #define TIMEOUT 50
+#define IR_RATIO 32699
+
+#define INIT_HEALTH 100
 
 //Defining packet types
 #define SYNC 'S'
@@ -31,10 +34,11 @@ TM1637Display display = TM1637Display(CLK, DIO);
 const uint16_t PLAYER_1_ADDRESS = 0x0102; //Address for Player 1's Shot
 const uint16_t PLAYER_2_ADDRESS = 0x0105; //Address for Player 2's Shot
 uint8_t shotID;
-uint8_t health = 100;
+uint8_t health = INIT_HEALTH;
 uint8_t lifeStatus = 0;
 bool sendData = false;
 unsigned long sensorDelayStartTime = 0;
+int i;
 
 const uint8_t DEAD[] = {
     SEG_A | SEG_B | SEG_C | SEG_D | SEG_E,   // D
@@ -159,9 +163,9 @@ void Protocol::start_communication() {
 
 void Protocol::send_data() {
     this->currentTime = millis();
-    if ( (hasHandshakeEnded) && (this->currentTime -  this->previousTime > TIMEOUT) && sendDataPacket) {
+    if ( (hasHandshakeEnded) && (this->currentTime -  this->previousTime > TIMEOUT) && sendData) {
         Serial.write((byte*)&packet, sizeof(packet));
-        sendDataPacket = false;
+        sendData= false;
         this->previousTime = this->currentTime;
     }
     /* byte dataAck = Serial.read(); */
@@ -199,53 +203,46 @@ void setup() {
 }
 
 void loop() {
-    if (Serial.available()) {
-        int newHealth = Serial.readString().toInt();
-        if (health != newHealth) {
-            health = newHealth;
-        }
-    }
-
     if (!hasHandshakeEnded) {
         communicationProtocol->start_communication();
+        return;
     }
+    /* for (i = 0; i < IR_RATIO; ++i) { */
+    if (IrReceiver.decode()) {
 
+        /* if (IrReceiver.decodedIRData.command == 0x01) {   //if hit by player 2's shot */
+        shotID = IrReceiver.decodedIRData.command;  //shotID of the player that hit you
+        sendData = true;
+        health -= 10;
+        tone(BUZZER_PIN,5000,100);
+        display.showNumberDec(health);
+        sensorDelayStartTime = millis();
+        sensorDelay(100);
+
+        communicationProtocol->initialize_packet_data();
+        communicationProtocol->send_data();
+
+        if (health == 0) {
+            display.setSegments(DEAD);
+            deadTune();
+            sensorDelayStartTime = millis();
+            sensorDelay(1000);
+            health = 100;
+            display.showNumberDec(health);
+        }
+        /* } */
+        IrReceiver.begin(IR_RCV_PIN); //continue receiving IR signals
+        /* IrReceiver.resume(); */
+    }
+    /* } */
     if (Serial.available()) {
         sensorDelayStartTime = millis();
         sensorDelay(50);
         int newHealth = Serial.readString().toInt();
+        tone(BUZZER_PIN,5000,100);
         if (health != newHealth) {
             health = newHealth;
-        }
-    }
-
-    if (IrReceiver.decode()) {
-
-        IrReceiver.printIRResultShort(&Serial);
-        //    Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);
-
-        if (IrReceiver.decodedIRData.command == 0x02) {   //if hit by player 2's shot
-            shotID = IrReceiver.decodedIRData.command;  //shotID of the player that hit you
-            sendData = true;
-            health -= 10;
-            tone(BUZZER_PIN,5000,100);
             display.showNumberDec(health);
-            sensorDelayStartTime = millis();
-            sensorDelay(100);
-
-            communicationProtocol->initialize_packet_data();
-            communicationProtocol->send_data();
-
-            if (health == 0) {
-                display.setSegments(DEAD);
-                deadTune();
-                sensorDelayStartTime = millis();
-                sensorDelay(1000);
-                health = 100;
-                display.showNumberDec(health);
-            }
         }
-        IrReceiver.resume();
     }
-
 }

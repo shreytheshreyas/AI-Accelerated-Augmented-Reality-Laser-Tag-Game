@@ -229,7 +229,7 @@ void loop() {
         }
 
         sensorDelayStartTime = millis();
-        sensorDelay(500);
+        sensorDelay(1000);
     }
 
 //  communicationProtocol->clear_serial_buffer();
