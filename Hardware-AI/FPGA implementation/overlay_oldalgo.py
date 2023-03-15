@@ -6,9 +6,10 @@ import math
 INPUT_SIZE = 30
 OUTPUT_SIZE = 3
 
-NUMBER_OF_SENSOR_FEATURES = 8
+NUMBER_OF_SENSOR_FEATURES = 6
 WINDOW_SIZE = 5
-THRESHOLD = 0.12
+THRESHOLD = 2
+THRESHOLD_NUMBER = 1
 
 def test_input():
     stream = np.array([[0.3050025203548387,0.4475195293879845,0.5355742933800642,-1.1953125,0.96484375,-0.9778855847741936,0.7852111311764203,1.2461652448273612,-2.0,1.1484375,-0.059475806451612906,0.4977829006761008,0.4932869675930172,-1.047851563,0.912109375,-39.875504032258064,131.01913473818806,134.91600021123415,-220.734375,232.3203125,49.366431451612904,148.65692425640162,154.3472013041854,-228.4375,252.65625,91.27923387096774,137.9288067558928,163.5315424453612,-219.5390625,248.1328125],
@@ -51,15 +52,14 @@ def replace_nan(arr):
             arr[WINDOW_SIZE-1, idx] = np.nan_to_num(arr[WINDOW_SIZE-1, idx], np.median(arr[0:WINDOW_SIZE-2, idx]))
     return arr
 
-# init variables
-window_data = np.empty((0,NUMBER_OF_SENSOR_FEATURES))
-
-# variables to be used when start of move is identified
-start_of_move_flag = 0
-action_sample_count = 0
-action_arr = np.empty((0, NUMBER_OF_SENSOR_FEATURES))
-
 def sliding_window(data):
+    window_data = np.empty((0,NUMBER_OF_SENSOR_FEATURES))
+
+    # variables to be used when start of move is identified
+    start_of_move_flag = 0
+    action_sample_count = 0
+    action_arr = np.empty((0, NUMBER_OF_SENSOR_FEATURES))
+
     data = np.reshape(data, (1,NUMBER_OF_SENSOR_FEATURES))
 
     if start_of_move_flag == 0:
@@ -68,6 +68,7 @@ def sliding_window(data):
         if len(window_data) < WINDOW_SIZE:
             if np.isnan(data).any():
                 data = np.nan_to_num(data)
+
 
         prev_window_data = window_data
         window_data = np.append(window_data, data, axis=0)
@@ -79,30 +80,32 @@ def sliding_window(data):
             if np.isnan(data).any():
                 window_data = replace_nan(window_data)
             
-            # calculate energy of window and prev window
-            rms_acc_curr_window = 0
-            rms_acc_prev_window = 0
-            for idx, row in enumerate(window_data):
-                rms_acc_curr_window = rms_acc_curr_window + rmsValue(window_data.T[0:3], idx)
-                rms_acc_prev_window = rms_acc_prev_window + rmsValue(prev_window_data.T[0:3], idx)
-                    
-            energy_curr_window = rms_acc_curr_window / WINDOW_SIZE
-            energy_prev_window = rms_acc_prev_window / len(prev_window_data)
+            # if mean of current window > mean + k * std of prev window, identify as start of move
+            data_above_threshold = 0
+            for idx, col in enumerate(window_data.T):
+                mean_curr_window = np.mean(col)
+                mean_prev_window = np.mean(prev_window_data[:, idx])
+                std_curr_window = np.std(col)
 
-            # start of move identifier, find if increase in energy of the windows is > threshold
-            if energy_curr_window - energy_prev_window > THRESHOLD:
+                if mean_curr_window > mean_prev_window + THRESHOLD * std_curr_window:
+                    data_above_threshold = data_above_threshold + 1
+
+            if data_above_threshold > THRESHOLD_NUMBER:
+                print("start of move at: ", window_data)
                 action_arr = np.append(action_arr, window_data, axis=0)
                 start_of_move_flag = 1
     else: 
-        action_arr = np.append(action_arr, data, axis=0)
-        action_sample_count = action_sample_count + 1
-        if action_sample_count == 22:
+        if action_sample_count == 15:
             segment_move(action_arr)
 
             # reset flags and action window
             start_of_move_flag = 0
             action_sample_count = 0
             action_arr = np.empty((0, NUMBER_OF_SENSOR_FEATURES))
+        else:
+            action_arr = np.append(action_arr, data, axis=0)
+            action_sample_count = action_sample_count + 1
+            # continue to send window result = none
 
 def segment_move(action_window):
     # find statistical features of action and feed it to model
@@ -162,6 +165,7 @@ def segment_move(action_window):
     prediction = np.argmax(out_buffer)
     print('prediction: ', prediction, '\n')
 
+
 def rmsValue(arr, col):
     square = 0
     mean = 0.0
@@ -169,8 +173,8 @@ def rmsValue(arr, col):
     n = arr.shape[0]
      
     #Calculate square
-    for column_value in arr[:,col]:
-        square += (pow(column_value,2))
+    for column in arr[col]:
+        square += (pow(column,2))
      
     #Calculate Mean
     mean = (square / (float)(n))
@@ -179,6 +183,7 @@ def rmsValue(arr, col):
     root = math.sqrt(mean)
      
     return root
+
 
 
 if __name__ == "__main__":

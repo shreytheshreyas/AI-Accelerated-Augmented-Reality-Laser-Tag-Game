@@ -1,13 +1,35 @@
+from cmath import e
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import math
 
-WINDOW_SIZE = 5
+WINDOW_SIZE = 8
 NUMBER_OF_FEATURES= 6
-THRESHOLD = 2
-THRESHOLD_NUMBER = 1
+THRESHOLD = 0.12
 
-DATA_FILE = 'dataset1.csv'
+DATA_FILE = 'shield.csv'
+
+
+def graph_data(data, x_axis):
+    
+    graph, axis = plt.subplots(nrows=6,
+           sharex='col')
+    axis[0].plot(x_axis, 'Linear-X', data=data, color="#1f77b4")
+    axis[1].plot(x_axis, 'Linear-Y', data=data, color="#6DD3CE")
+    axis[2].plot(x_axis, 'Linear-Z', data=data, color="#C8E9A0")
+    axis[3].plot(x_axis, 'Gyro-X', data=data, color="#F7A278")
+    axis[4].plot(x_axis, 'Gyro-Y', data=data, color="#A13D63")
+    axis[5].plot(x_axis, 'Gyro-Z', data=data, color="#9BC1BC")
+
+    plt.show()
+
+def graph_data_window(x_axis, y_axis):
+    
+    plt.plot(x_axis, y_axis)
+
+    plt.show()
+
 
 def replace_nan(arr):
     for idx, val in enumerate(arr[WINDOW_SIZE-1]):
@@ -24,7 +46,11 @@ def sliding_window(raw_data):
     action_sample_count = 0
     action_arr = np.empty((0, NUMBER_OF_FEATURES))
 
-    for data in raw_data:
+    # to graph out energy
+    energy_arr = []
+    time_arr = []
+
+    for time, data in enumerate(raw_data):
         data = np.reshape(data, (1,NUMBER_OF_FEATURES))
 
         if start_of_move_flag == 0:
@@ -33,7 +59,6 @@ def sliding_window(raw_data):
             if len(window_data) < WINDOW_SIZE:
                 if np.isnan(data).any():
                     data = np.nan_to_num(data)
-
 
             prev_window_data = window_data
             window_data = np.append(window_data, data, axis=0)
@@ -45,31 +70,38 @@ def sliding_window(raw_data):
                 if np.isnan(data).any():
                     window_data = replace_nan(window_data)
             
-                # if mean of current window > mean + k * std of prev window, identify as start of move
-                data_above_threshold = 0
-                for idx, col in enumerate(window_data.T):
-                    mean_curr_window = np.mean(col)
-                    mean_prev_window = np.mean(prev_window_data[:, idx])
-                    std_curr_window = np.std(col)
+                # calculate energy of window and prev window
+                rms_acc_curr_window = 0
+                rms_acc_prev_window = 0
+                for idx, row in enumerate(window_data):
+                    rms_acc_curr_window = rms_acc_curr_window + rmsValue(window_data.T[0:3], idx)
+                    rms_acc_prev_window = rms_acc_prev_window + rmsValue(prev_window_data.T[0:3], idx)
+                    
+                energy_curr_window = rms_acc_curr_window / WINDOW_SIZE
+                energy_prev_window = rms_acc_prev_window / len(prev_window_data)
 
-                    if mean_curr_window > mean_prev_window + THRESHOLD * std_curr_window:
-                        data_above_threshold = data_above_threshold + 1
-                if data_above_threshold > THRESHOLD_NUMBER:
-                    print("start of move at: ", window_data)
+                #print("time: ", time, "energy curr: ", energy_curr_window)
+
+                # to graph out energy
+                energy_arr.append(energy_curr_window)
+                time_arr.append(time)
+
+                if energy_curr_window - energy_prev_window > THRESHOLD:
+                    print("start of move at: ", time)
                     action_arr = np.append(action_arr, window_data, axis=0)
                     start_of_move_flag = 1
         else: 
-            if action_sample_count == 15:
-                print("action sample: ")
+            action_arr = np.append(action_arr, data, axis=0)
+            action_sample_count = action_sample_count + 1
+            if action_sample_count == 22:
                 segment_move(action_arr)
 
                 # reset flags and action window
                 start_of_move_flag = 0
                 action_sample_count = 0
                 action_arr = np.empty((0, NUMBER_OF_FEATURES))
-            else:
-                action_arr = np.append(action_arr, data, axis=0)
-                action_sample_count = action_sample_count + 1
+
+    #graph_data_window(time_arr, energy_arr)
 
 def segment_move(window):
     # find statistical features of window and feed it to model
@@ -123,8 +155,8 @@ def rmsValue(arr, col):
     n = arr.shape[0]
      
     #Calculate square
-    for column in arr[col]:
-        square += (pow(column,2))
+    for column_value in arr[:,col]:
+        square += (pow(column_value,2))
      
     #Calculate Mean
     mean = (square / (float)(n))
@@ -138,5 +170,7 @@ def rmsValue(arr, col):
 if __name__ == "__main__":
     data_pandas = pd.read_csv(DATA_FILE, header=None)
     raw_data = data_pandas.drop([0,7], axis=1).drop(data_pandas.index[0]).to_numpy().astype(float)
-    print(raw_data)
     sliding_window(raw_data)
+
+    grenade_data = pd.read_csv(DATA_FILE, header=0)
+    #graph_data(grenade_data, grenade_data.index)
