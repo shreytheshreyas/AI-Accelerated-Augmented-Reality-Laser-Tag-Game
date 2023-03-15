@@ -1,5 +1,4 @@
 import socket
-from types import NoneType
 
 from sshtunnel import open_tunnel
 
