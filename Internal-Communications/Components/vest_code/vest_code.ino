@@ -1,8 +1,20 @@
+#include <IRremote.hpp>
+#include <TM1637Display.h>
+#include "pitches.h"
+
+//Defining Necessary Constants for IR Receiver
+#define DECODE_NEC
+#define CLK 4
+#define DIO 2
+#define IR_RCV_PIN 3
+#define BUZZER_PIN 5
+
 //Defining important constants
 #define PACKET_SIZE 20
 #define SENSOR_DATA 20
 #define DATA_RATE 115200
 #define TIMEOUT 50
+
 //Defining packet types
 #define SYNC 'S'
 #define ACK 'A'
@@ -12,6 +24,38 @@
 #define RST 'R'
 #define RST_ACK 'r'
 #define FIN 'F'
+
+// Create a display object of type TM1637Display
+TM1637Display display = TM1637Display(CLK, DIO);
+
+const uint16_t PLAYER_1_ADDRESS = 0x0102; //Address for Player 1's Shot
+const uint16_t PLAYER_2_ADDRESS = 0x0105; //Address for Player 2's Shot
+bool isShot = false;  //To indicate if hit is registered
+uint8_t shotID;
+uint8_t shotCounter = 0;
+uint8_t health = 100;
+uint8_t lifeStatus = 0;
+bool sendData = false;
+unsigned long sensorDelayStartTime = 0;
+
+const uint8_t DEAD[] = {
+  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E,   // D
+  SEG_A | SEG_D | SEG_E | SEG_F | SEG_G,   // E
+  SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,   // A
+  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E            // D
+};
+
+int melody[] = {
+
+  NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4
+};
+
+// note durations: 4 = quarter note, 8 = eighth note, etc.:
+int noteDurations[] = {
+
+  4, 8, 8, 4, 4, 4, 4, 4
+};
+
 
 //Class definition for protocol
 class Protocol {
@@ -73,7 +117,7 @@ void Protocol::get_sensor_data() {
 void Protocol::initialize_packet_data() {
   this->packet[0] = this->sequenceNumber;
   this->packet[1] = VEST_DATA;
-  this->packet[2] = this->sensorData[sensorDataIdx];
+  this->packet[2] = lifeStatus;
   this->packet[PACKET_SIZE - 1] = this->calculate_checksum(); 
 }
 
@@ -118,16 +162,39 @@ void Protocol::start_communication() {
                 break;
     }
 
-  if ( (hasHandshakeEnded) && (currentTime -  previousTime > TIMEOUT) &&  receivedData != ACK) { 
+  if ( (hasHandshakeEnded) && (currentTime -  previousTime > TIMEOUT) &&  receivedData != ACK && sendData) { 
     Serial.write((byte*)&packet, sizeof(packet));
+    sendData = false;
     previousTime = currentTime;
   }
 
   this->clear_serial_buffer();
 }
 
+void sensorDelay(long interval) {
+ unsigned long currentMillis = millis();
+
+ while(currentMillis - sensorDelayStartTime < interval)
+    currentMillis = millis();
+ 
+}
+void deadTune(){
+  for (int thisNote = 0; thisNote < 8; thisNote++) {
+    int noteDuration = 1000 / noteDurations[thisNote];
+    tone(BUZZER_PIN, melody[thisNote], noteDuration);
+    int pauseBetweenNotes = noteDuration * 1.30;
+    sensorDelayStartTime = millis();
+    sensorDelay(pauseBetweenNotes);
+    noTone(8);
+  }
+}
+
 void setup() {
   Serial.begin(DATA_RATE);
+  pinMode(BUZZER_PIN,OUTPUT);  
+  display.setBrightness(5);
+  display.showNumberDec(health);
+  IrReceiver.begin(IR_RCV_PIN); //Start receiving
   hasHandshakeStarted = false;
   hasHandshakeEnded = false;
   communicationProtocol = new Protocol();
@@ -135,6 +202,54 @@ void setup() {
 
 void loop() {
 //  Serial.flush();
+    if (IrReceiver.decode()) {  
+    
+//    IrReceiver.printIRResultShort(&Serial);
+//    Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);
+    
+    if (IrReceiver.decodedIRData.command == 0x02) {   //if hit by player 2's shot
+      isShot = true;
+           
+      shotID = IrReceiver.decodedIRData.command;  //shotID of the player that hit you
+//      Serial.println("Received signal");  //debug
+       
+      if (isShot == true && health == 0) {
+//        lifeStatus = 13;
+        sendData = true;
+        display.setSegments(DEAD);
+        deadTune();
+        health = 0;
+      } 
+      else if (isShot == true){
+        shotCounter += 1;
+//        lifeStatus = 1; 
+        sendData = true;
+        health = 100 - shotCounter*10;
+        tone(BUZZER_PIN,5000,100);
+        isShot = false;
+
+        if (health == 0) {
+          display.setSegments(DEAD);
+          deadTune();
+          sensorDelayStartTime = millis();
+          sensorDelay(100);
+//          health = 100; //uncomment later
+          display.showNumberDec(health);
+        }
+        else {
+          display.showNumberDec(health);
+          sensorDelayStartTime = millis();
+          sensorDelay(100);
+        }
+
+      }       
+    }
+    IrReceiver.begin(IR_RCV_PIN); //continue receiving IR signals
+//     IrReceiver.resume();
+  }
+
+  lifeStatus = (health == 0) ? 13 : 1;
+  
   communicationProtocol->initialize_packet_data();
   communicationProtocol->start_communication();
 //  communicationProtocol->clear_serial_buffer();
