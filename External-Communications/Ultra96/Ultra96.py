@@ -55,7 +55,7 @@ class Ultra96:
         )
         self.mqtt_client = MQTTClient(self.vis_queue, self.opp_in_frames)
 
-    def setup_connections(self):
+    def connect_to_eval(self):
         self.eval_client.connect()
 
     def start_game(self):
@@ -68,6 +68,9 @@ class Ultra96:
             relay_server_process.start()
             engine_process.start()
             mqtt_process.start()
+
+            _ = input("")
+            self.connect_to_eval()
             eval_process.start()
 
             eval_process.join()
@@ -108,6 +111,5 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    ultra96 = Ultra96("127.0.0.1", relay_port, "127.0.0.1", eval_port, stub)
-    ultra96.setup_connections()
+    ultra96 = Ultra96("127.0.0.1", relay_port, "137.132.92.184", 9999, stub)
     ultra96.start_game()

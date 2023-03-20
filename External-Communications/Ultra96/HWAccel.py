@@ -2,18 +2,40 @@ import datetime as dt
 import math
 
 import numpy as np
+
+import pickle5 as pickle
 import pynq
 from Helper import Actions
+
+from torch import nn
 
 INPUT_SIZE = 30
 OUTPUT_SIZE = 3
 
 NUMBER_OF_SENSOR_FEATURES = 6
-START_MOVE_WINDOW_SIZE = 5
+START_MOVE_WINDOW_SIZE = 8
 PREDICTION_WINDOW_SIZE = 30
 REQUIRED_WINDOW_SIZE = PREDICTION_WINDOW_SIZE - START_MOVE_WINDOW_SIZE
-THRESHOLD = 1.5
-THRESHOLD_NUMBER = 1
+THRESHOLD = 0.11
+
+
+# class MLP(nn.Module):
+#     """
+#     Multilayer Perceptron.
+#     """
+#
+#     def init(self):
+#         super().init()
+#         self.layers = nn.Sequential(
+#             nn.Linear(INPUT_SIZE, LAYER_1_SIZE),
+#             nn.LeakyReLU(),
+#             nn.Linear(LAYER_1_SIZE, OUTPUT_SIZE),
+#             nn.Softmax(dim=1),
+#         )
+#
+#     def forward(self, x):
+#         """Forward pass"""
+#         return self.layers(x)
 
 
 class HWAccel:
@@ -30,9 +52,11 @@ class HWAccel:
         self.window_data = np.empty((0, NUMBER_OF_SENSOR_FEATURES))
 
         # self.variables to be used when start of move is identified
-        self.start_of_move_flag = 0
+        self.start_of_move_flag = 1
         self.action_sample_count = 0
         self.action_arr = np.empty((0, NUMBER_OF_SENSOR_FEATURES))
+
+        # self.pickled_model = pickle.load(open("mlp_model.pkl", "rb"))
 
     # def get_action(self, msg):
     #     for i, value in enumerate(msg.split(",")):
@@ -51,16 +75,8 @@ class HWAccel:
                     arr[START_MOVE_WINDOW_SIZE - 1, idx],
                     np.median(arr[0 : START_MOVE_WINDOW_SIZE - 2, idx]),
                 )
-        return arr
 
     def get_action(self, data):
-        # curr = dt.datetime.now().timestamp()
-        # if self.prev:
-        #     period = curr - self.prev
-        #     self.total += period
-        #     self.count += 1
-        #     print("Average time = ", self.total / self.count)
-        # self.prev = curr
         data = np.reshape(data, (1, NUMBER_OF_SENSOR_FEATURES))
 
         if self.start_of_move_flag == 0:
@@ -79,26 +95,26 @@ class HWAccel:
                 if np.isnan(data).any():
                     self.window_data = self.replace_nan(self.window_data)
 
-                # if mean of current window > mean + k * std of prev window, identify as start of move
-                data_above_threshold = 0
-                for idx, col in enumerate(self.window_data.T):
-                    mean_curr_window = np.mean(col)
-                    mean_prev_window = np.mean(prev_window_data[:, idx])
-                    std_curr_window = np.std(col)
+                # calculate energy of window and prev window
+                rms_acc_curr_window = 0
+                rms_acc_prev_window = 0
+                for idx, row in enumerate(self.window_data):
+                    rms_acc_curr_window = rms_acc_curr_window + self.rmsValue(
+                        self.window_data.T[0:3], idx
+                    )
+                    rms_acc_prev_window = rms_acc_prev_window + self.rmsValue(
+                        prev_window_data.T[0:3], idx
+                    )
 
-                    if (
-                        mean_curr_window
-                        > mean_prev_window + THRESHOLD * std_curr_window
-                    ):
-                        data_above_threshold = data_above_threshold + 1
+                energy_curr_window = rms_acc_curr_window / START_MOVE_WINDOW_SIZE
+                energy_prev_window = rms_acc_prev_window / len(prev_window_data)
 
-                if data_above_threshold > THRESHOLD_NUMBER:
-                    print("start of move at: ", self.window_data)
+                # start of move identifier, find if increase in energy of the windows is > threshold
+                if energy_curr_window - energy_prev_window > THRESHOLD:
                     self.action_arr = np.append(
                         self.action_arr, self.window_data, axis=0
                     )
                     self.start_of_move_flag = 1
-                    print("START OF MOVE")
         else:
             self.action_arr = np.append(self.action_arr, data, axis=0)
             self.action_sample_count = self.action_sample_count + 1
@@ -106,9 +122,10 @@ class HWAccel:
                 prediction = self.segment_move(self.action_arr)
 
                 # reset flags and action window
-                self.action_sample_count = 1
                 self.start_of_move_flag = 0
+                self.action_sample_count = 1
                 self.action_arr = np.empty((0, NUMBER_OF_SENSOR_FEATURES))
+
                 return prediction
 
         return Actions.no
@@ -163,8 +180,9 @@ class HWAccel:
         for x in self.out_buffer:
             print(x)
 
-        prediction = Actions.glove[1:][np.argmax(self.out_buffer)]
-        # print("prediction: ", prediction, "\n")
+        # self.out_buffer = self.pickled_model.predict(self.in_buffer)
+        prediction = Actions.glove[np.argmax(self.out_buffer)]
+        print("prediction:", prediction)
         return prediction
 
     def rmsValue(self, arr, col):
@@ -174,8 +192,8 @@ class HWAccel:
         n = arr.shape[0]
 
         # Calculate square
-        for column in arr[col]:
-            square += pow(column, 2)
+        for column_value in arr[:, col]:
+            square += pow(column_value, 2)
 
         # Calculate Mean
         mean = square / (float)(n)

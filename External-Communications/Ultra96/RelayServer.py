@@ -153,6 +153,7 @@ class RelayServer:
             action = self.ai.get_action(list(data.values())[1:])
 
             if action != Actions.no:
+                print(action)
                 action_queue.put((player, action))
 
         conn.close()
@@ -187,7 +188,7 @@ class RelayServer:
             self.connected[id] = True
             self.send_plaintext(f"Server connection for {component} accepted", conn)
 
-        if sensor == 'gun' or sensor == 'vest':
+        if sensor == "gun" or sensor == "vest":
             self.edit_conn_queue.put((component, conn))
             time.sleep(0.1)
             self.action_queue.put((player, "conn_" + sensor))
