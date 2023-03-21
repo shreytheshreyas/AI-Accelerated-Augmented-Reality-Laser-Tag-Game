@@ -10,13 +10,12 @@ from Helper import Actions
 from torch import nn
 
 INPUT_SIZE = 30
-OUTPUT_SIZE = 3
+OUTPUT_SIZE = 4
 
 NUMBER_OF_SENSOR_FEATURES = 6
 START_MOVE_WINDOW_SIZE = 8
 PREDICTION_WINDOW_SIZE = 30
-REQUIRED_WINDOW_SIZE = PREDICTION_WINDOW_SIZE - START_MOVE_WINDOW_SIZE
-THRESHOLD = 0.11
+THRESHOLD = 0.12
 
 
 # class MLP(nn.Module):
@@ -47,13 +46,12 @@ class HWAccel:
 
         self.dma = self.overlay.axi_dma_0
 
-        self.in_buffer = pynq.allocate(shape=(60,), dtype=np.double)
-        self.out_buffer = pynq.allocate(shape=(4,), dtype=np.double)
+        self.in_buffer = pynq.allocate(shape=(INPUT_SIZE,), dtype=np.double)
+        self.out_buffer = pynq.allocate(shape=(OUTPUT_SIZE,), dtype=np.double)
         self.window_data = np.empty((0, NUMBER_OF_SENSOR_FEATURES))
 
         # self.variables to be used when start of move is identified
-        self.start_of_move_flag = 1
-        self.action_sample_count = 0
+        self.start_of_move_flag = 0
         self.action_arr = np.empty((0, NUMBER_OF_SENSOR_FEATURES))
 
         # self.pickled_model = pickle.load(open("mlp_model.pkl", "rb"))
@@ -106,7 +104,7 @@ class HWAccel:
                         prev_window_data.T[0:3], idx
                     )
 
-                energy_curr_window = rms_acc_curr_window / START_MOVE_WINDOW_SIZE
+                energy_curr_window = rms_acc_curr_window / len(self.window_data)
                 energy_prev_window = rms_acc_prev_window / len(prev_window_data)
 
                 # start of move identifier, find if increase in energy of the windows is > threshold
@@ -117,13 +115,11 @@ class HWAccel:
                     self.start_of_move_flag = 1
         else:
             self.action_arr = np.append(self.action_arr, data, axis=0)
-            self.action_sample_count = self.action_sample_count + 1
-            if self.action_sample_count == REQUIRED_WINDOW_SIZE:
+            if len(self.action_arr) == PREDICTION_WINDOW_SIZE:
                 prediction = self.segment_move(self.action_arr)
 
                 # reset flags and action window
                 self.start_of_move_flag = 0
-                self.action_sample_count = 1
                 self.action_arr = np.empty((0, NUMBER_OF_SENSOR_FEATURES))
 
                 return prediction
@@ -176,9 +172,6 @@ class HWAccel:
 
         self.dma.sendchannel.wait()
         self.dma.recvchannel.wait()
-
-        for x in self.out_buffer:
-            print(x)
 
         # self.out_buffer = self.pickled_model.predict(self.in_buffer)
         prediction = Actions.glove[np.argmax(self.out_buffer)]
