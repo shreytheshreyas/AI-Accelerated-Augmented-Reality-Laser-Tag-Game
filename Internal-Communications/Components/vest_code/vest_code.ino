@@ -237,24 +237,23 @@ void loop() {
     }
     /* } */
     if (Serial.available()) {
-        String data = Serial.readString();
-        Serial.Println(data);
-
-        byte* buf;
-        if ( data.length() == 1 ) {
-            data.getBytes(buf, 1);
-            if (*buf == RST) {
-                Serial.Println("bytes match");
-                hasHandshakeStarted = false;
-                hasHandshakeEnded = false;
-                //                this->clear_serial_buffer();
-                Serial.write(RST);
-            }
+        int data = Serial.read();
+        //Serial.print(data);
+        if ((char)data == RST) {
+            //Serial.print("bytes match");
+            //Serial.write('M');
+            hasHandshakeStarted = false;
+            hasHandshakeEnded = false;
+            Serial.write(RST);
+            return;
         }
 
+        if (data == 125) {
+            data = 130;
+        }
         sensorDelayStartTime = millis();
         sensorDelay(50);
-        int newHealth = data.toInt();
+        int newHealth = data;
         tone(BUZZER_PIN,5000,100);
         if (health != newHealth) {
             health = newHealth;

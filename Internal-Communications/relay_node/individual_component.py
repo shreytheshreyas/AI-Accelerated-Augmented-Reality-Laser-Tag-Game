@@ -582,9 +582,10 @@ class BlunoDevice:
         self.macAddress = macAddress
         self.peripheral = None
         self.blutoothInterfaceHandler = None
-        self.laptopClient = LaptopClient("192.168.95.250", 8081)
+        self.laptopClient = LaptopClient("192.168.95.250", 8082)
         self.connectedToUltra = False
 
+    # data should be string format of ascii
     def transmit_packet(self, data):
         try:
             for characteristic in self.peripheral.getCharacteristics():
@@ -684,8 +685,12 @@ class BlunoDevice:
                         avail, first = self.laptopClient.available()
                         if avail:
                             print("Data from relay node availble")
-                            data = self.laptopClient.recv_msg(first)
+                            data = int(self.laptopClient.recv_msg(first))
                             print(f"Sending data [{data}] to component")
+                            if data == 130:
+                                data = 125
+
+                            data = chr(data)
                             self.transmit_packet(data)
                             print("Data sent to component")
 
@@ -767,10 +772,10 @@ if __name__ == "__main__":
     try:
         # Starting beetle Threads
         beetleThread0.start()
-        beetleThread1.start()
+        # beetleThread1.start()
         beetleThread2.start()
         beetleThread3.start()
-        beetleThread4.start()
+        # beetleThread4.start()
         beetleThread5.start()
         # beetleThread6.start()
         # beetleThread7.start()
@@ -778,10 +783,10 @@ if __name__ == "__main__":
 
         # Terminating beetle Threads
         beetleThread0.join()
-        beetleThread1.join()
+        # beetleThread1.join()
         beetleThread2.join()
         beetleThread3.join()
-        beetleThread4.join()
+        # beetleThread4.join()
         beetleThread5.join()
         # beetleThread6.join()
         # beetleThread7.join()

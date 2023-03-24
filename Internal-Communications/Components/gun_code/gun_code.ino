@@ -182,12 +182,24 @@ void setup() {
 void loop() {
     if (!hasHandshakeEnded) {
         communicationProtocol->start_communication();
+        return;
     }
 
     if (Serial.available()) {
+        int data = Serial.read();
+        //Serial.print(data);
+        if ((char)data == RST) {
+            //Serial.print("bytes match");
+            //Serial.write('M');
+            hasHandshakeStarted = false;
+            hasHandshakeEnded = false;
+            Serial.write(RST);
+            return;
+        }
+
         sensorDelayStartTime = millis();
         sensorDelay(50);
-        int newBulletCount = Serial.readString().toInt();
+        int newBulletCount = data;
         if (bulletCount != newBulletCount) {
             bulletCount = newBulletCount;
             tone(buzzerPin,NOTE_C6,100);
