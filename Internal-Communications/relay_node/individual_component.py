@@ -61,7 +61,7 @@ MAC_ADDRESSES = {
     0: "D0:39:72:BF:CD:20",
     1: "D0:39:72:BF:CD:0A",
     2: "D0:39:72:BF:C8:D8",
-    3: "",
+    3: "6C:79:B8:D3:80:5B",
     4: "D0:39:72:BF:C3:8F",
     5: "D0:39:72:BF:CA:D4",
     6: "D0:39:72:BF:C8:89",
@@ -567,7 +567,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                 # if data is not coming out to be correct comment out these two lines
                 # self.receivingBuffer = b''
                 print("Packet is fragmented")
-                StatisticsManager.increment_num_of_fragmented_packets(self.beetleId)
+                # StatisticsManager.increment_num_of_fragmented_packets(self.beetleId)
                 pass
         except Exception as e:
             logging.info(
@@ -634,6 +634,7 @@ class BlunoDevice:
             )
 
     def reset_controller(self):
+        print("Sending RST")
         try:
             self.transmit_packet(RST)
             self.peripheral.waitForNotifications(1.0)
@@ -752,7 +753,7 @@ if __name__ == "__main__":
     beetleThread2 = threading.Thread(
         target=beetle2.transmission_protocol, args=(False,)
     )
-    # beetleThread3 = threading.Thread(target=beetle3.transmission_protocol, args=(True,))
+    beetleThread3 = threading.Thread(target=beetle3.transmission_protocol, args=(True,))
     beetleThread4 = threading.Thread(target=beetle4.transmission_protocol, args=(True,))
     beetleThread5 = threading.Thread(
         target=beetle5.transmission_protocol, args=(False,)
@@ -766,22 +767,22 @@ if __name__ == "__main__":
     try:
         # Starting beetle Threads
         beetleThread0.start()
-        # beetleThread1.start()
-        # beetleThread2.start()
-        # beetleThread3.start()
+        beetleThread1.start()
+        beetleThread2.start()
+        beetleThread3.start()
         beetleThread4.start()
-        # beetleThread5.start()
+        beetleThread5.start()
         # beetleThread6.start()
         # beetleThread7.start()
         # beetleThread8.start()
 
         # Terminating beetle Threads
         beetleThread0.join()
-        # beetleThread1.join()
-        # beetleThread2.join()
-        # beetleThread3.join()
+        beetleThread1.join()
+        beetleThread2.join()
+        beetleThread3.join()
         beetleThread4.join()
-        # beetleThread5.join()
+        beetleThread5.join()
         # beetleThread6.join()
         # beetleThread7.join()
         # beetleThread8.join()

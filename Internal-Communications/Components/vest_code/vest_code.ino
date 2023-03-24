@@ -221,6 +221,7 @@ void loop() {
 
         communicationProtocol->initialize_packet_data();
         communicationProtocol->send_data();
+        /* Serial.Println(shotID); */
 
         if (health == 0) {
             display.setSegments(DEAD);
@@ -236,9 +237,24 @@ void loop() {
     }
     /* } */
     if (Serial.available()) {
+        String data = Serial.readString();
+        Serial.Println(data);
+
+        byte* buf;
+        if ( data.length() == 1 ) {
+            data.getBytes(buf, 1);
+            if (*buf == RST) {
+                Serial.Println("bytes match");
+                hasHandshakeStarted = false;
+                hasHandshakeEnded = false;
+                //                this->clear_serial_buffer();
+                Serial.write(RST);
+            }
+        }
+
         sensorDelayStartTime = millis();
         sensorDelay(50);
-        int newHealth = Serial.readString().toInt();
+        int newHealth = data.toInt();
         tone(BUZZER_PIN,5000,100);
         if (health != newHealth) {
             health = newHealth;
