@@ -4,9 +4,9 @@ import time
 from GameState import GameState
 from Helper import Actions
 
-TWO_PLAYER = False
+TWO_PLAYER = True
 
-TURN_MAX_TIME = 3
+TURN_MAX_TIME = 9
 
 SENSOR_MAPPING = {"gun": "bullets", "vest": "hp"}
 
@@ -49,10 +49,13 @@ class GameEngine:
         player_1.initialize_from_dict(update["p1"])
         player_2.initialize_from_dict(update["p2"])
 
-    def reset_turn(self):
-        # print("Resetting")
+    def reset_timer(self):
         self.turn_end_time = time.time() + TURN_MAX_TIME
         self.turn_time_left = TURN_MAX_TIME
+
+    def reset_turn(self):
+        # print("Resetting")
+        self.reset_timer()
         self.complete = {"p1": False, "p2": False}
 
         self.signals = {
@@ -68,31 +71,33 @@ class GameEngine:
             },
         }
 
-    def check_turn(self, player):
+    def check_turn(self, player, opp):
         if (
-            self.signals[player]["action"] == Actions.shoot
-            and self.signals[player]["opp_hit"]
-        ):
-            self.complete[player] = True
-
-        elif (
-            self.signals[player]["action"] == Actions.grenade
+            (
+                self.signals[player]["action"] == Actions.shoot
+                and self.signals[player]["opp_hit"]
+            )
+            or self.signals[player]["action"] == Actions.grenade
             or self.signals[player]["action"] == Actions.reload
             or self.signals[player]["action"] == Actions.shield
         ):
             self.complete[player] = True
+            if not self.complete[opp]:
+                self.reset_timer()
 
     def get_opp(self, player):
         return "p1" if player == "p2" else "p2"
 
     def is_complete(self):
         if TWO_PLAYER:
-            return self.complete["p1"] or self.complete["p2"]
+            if self.complete["p1"] and self.complete["p2"]:
+                print("Both complete")
+                return True
+            return False
 
-        return self.complete["p1"] and self.complete["p2"]
+        return self.complete["p1"] or self.complete["p2"]
 
     def is_turn_over(self):
-        print("Turn is over")
         self.turn_time_left = max(self.turn_end_time - time.time(), 0)
         return self.turn_time_left <= 0
 
@@ -128,8 +133,8 @@ class GameEngine:
             elif action == Actions.hit:
                 self.signals[opp]["opp_hit"] = True
 
-            self.check_turn("p1")
-            self.check_turn("p2")
+            self.check_turn("p1", "p2")
+            self.check_turn("p2", "p1")
 
             if self.is_complete() or self.is_turn_over():
                 action_p1 = self.signals["p1"]["action"]
