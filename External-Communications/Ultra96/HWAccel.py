@@ -1,13 +1,10 @@
-import datetime as dt
 import math
 
 import numpy as np
 
-import pickle5 as pickle
 import pynq
 from Helper import Actions
 
-from torch import nn
 
 INPUT_SIZE = 30
 OUTPUT_SIZE = 4
@@ -18,33 +15,21 @@ PREDICTION_WINDOW_SIZE = 30
 THRESHOLD = 0.12
 
 
-# class MLP(nn.Module):
-#     """
-#     Multilayer Perceptron.
-#     """
-#
-#     def init(self):
-#         super().init()
-#         self.layers = nn.Sequential(
-#             nn.Linear(INPUT_SIZE, LAYER_1_SIZE),
-#             nn.LeakyReLU(),
-#             nn.Linear(LAYER_1_SIZE, OUTPUT_SIZE),
-#             nn.Softmax(dim=1),
-#         )
-#
-#     def forward(self, x):
-#         """Forward pass"""
-#         return self.layers(x)
-
-
-class HWAccel:
-    def __init__(self) -> None:
+class PlayerHWAccel:
+    def __init__(
+        self,
+        in_queue,
+        out_queue,
+        dma,
+    ):
         self.prev = 0
         self.count = 0
         self.total = 0
-        self.overlay = pynq.Overlay("mlp_fpga_design.bit")
 
-        self.dma = self.overlay.axi_dma_0
+        self.dma = dma
+
+        self.in_queue = in_queue
+        self.out_queue = out_queue
 
         self.in_buffer = pynq.allocate(shape=(INPUT_SIZE,), dtype=np.double)
         self.out_buffer = pynq.allocate(shape=(OUTPUT_SIZE,), dtype=np.double)
@@ -54,17 +39,11 @@ class HWAccel:
         self.start_of_move_flag = 0
         self.action_arr = np.empty((0, NUMBER_OF_SENSOR_FEATURES))
 
-        # self.pickled_model = pickle.load(open("mlp_model.pkl", "rb"))
-
-    # def get_action(self, msg):
-    #     for i, value in enumerate(msg.split(",")):
-    #         self.in_buffer[i] = value
-    #
-    #     self.dma.sendchannel.transfer(self.in_buffer)
-    #     self.dma.recvchannel.transfer(self.out_buffer)
-    #     action = Actions.glove[self.out_buffer.argmax()]
-    #
-    #     return action
+    def run(self):
+        while True:
+            data = self.in_queue.get()
+            prediction = self.get_action(data)
+            self.out_queue.put(prediction)
 
     def replace_nan(self, arr):
         for idx, val in enumerate(arr[START_MOVE_WINDOW_SIZE - 1]):
@@ -195,3 +174,25 @@ class HWAccel:
         root = math.sqrt(mean)
 
         return root
+
+
+class HWAccel:
+    def __init__(
+        self,
+        in_queue_p1,
+        in_queue_p2,
+        out_queue_p1,
+        out_queue_p2,
+    ):
+        self.in_queue_p1 = in_queue_p1
+        self.in_queue_p2 = in_queue_p2
+        self.out_queue_p1 = out_queue_p1
+        self.out_queue_p2 = out_queue_p2
+
+        self.overlay = pynq.Overlay("mlp_fpga_design.bit")
+
+        self.dma_p1 = self.overlay.axi_dma_0
+        self.dma_p2 = self.overlay.axi_dma_1
+
+        self.p1 = PlayerHWAccel(self.in_queue_p1, self.out_queue_p1, self.dma_p1)
+        self.p2 = PlayerHWAccel(self.in_queue_p2, self.out_queue_p2, self.dma_p2)

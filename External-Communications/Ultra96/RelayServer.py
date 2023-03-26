@@ -6,7 +6,6 @@ import time
 from Helper import Actions
 
 from HWAccel import HWAccel
-from HWAccel_Stub import HWAccel_Stub
 from Test import get_queue
 
 COMPONENT_IDS = {
@@ -26,15 +25,27 @@ class RelayServer:
         self.host = host
         self.port = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.edit_conn_queue = mp.Queue()
 
+        self.edit_conn_queue = mp.Queue()
         self.connected = mp.Array("i", [False] * 6)
         self.action_queue = action_queue
         self.update_beetle_queue = update_beetle_queue
 
-        # TODO: Replace with actual HWAccel
-        # self.ai = HWAccel_Stub()
-        self.ai = HWAccel()
+        self.glove_in_queue = {
+            "p1": mp.Queue(),
+            "p2": mp.Queue(),
+        }
+        self.glove_out_queue = {
+            "p1": mp.Queue(),
+            "p2": mp.Queue(),
+        }
+
+        self.ai = HWAccel(
+            self.glove_in_queue["p1"],
+            self.glove_in_queue["p2"],
+            self.glove_out_queue["p1"],
+            self.glove_out_queue["p2"],
+        )
 
     def recv_msg(self, conn):
         msg = None
@@ -142,7 +153,9 @@ class RelayServer:
             self.connected[COMPONENT_IDS[component]] = False
             print(f"Connection to {component} ended")
 
-    def handle_glove_conn(self, conn, action_queue, player, component):
+    def handle_glove_conn(
+        self, conn, action_queue, in_queue, out_queue, player, component
+    ):
         while True:
             msg = self.recv_msg(conn)
             if not msg:
@@ -150,7 +163,9 @@ class RelayServer:
 
             data = json.loads(msg)
 
-            action = self.ai.get_action(list(data.values())[1:])
+            in_queue.put(list(data.values())[1:])
+
+            action = out_queue.get()
 
             if action != Actions.no:
                 print(action)
@@ -244,11 +259,23 @@ class RelayServer:
                 )
                 p.start()
             elif sensor == "glove":
+                player_ai = getattr(self.ai, player)
                 p = mp.Process(
                     target=self.handle_glove_conn,
-                    args=(conn, self.action_queue, player, component),
+                    args=(
+                        conn,
+                        self.action_queue,
+                        self.glove_in_queue[player],
+                        self.glove_out_queue[player],
+                        player,
+                        component,
+                    ),
+                )
+                p_ai = mp.Process(
+                    target=player_ai.run,
                 )
                 p.start()
+                p_ai.start()
 
 
 if __name__ == "__main__":
