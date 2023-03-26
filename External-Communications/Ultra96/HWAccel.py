@@ -1,15 +1,17 @@
 import math
-
+import pickle
 import numpy as np
+from scipy.stats import kurtosis, skew
 
 import pynq
 from Helper import Actions
 
 
-INPUT_SIZE = 30
-OUTPUT_SIZE = 4
+INPUT_SIZE = 16
+OUTPUT_SIZE = 5
 
 NUMBER_OF_SENSOR_FEATURES = 6
+NUMBER_OF_ACTION_FEATURES = 60
 START_MOVE_WINDOW_SIZE = 8
 PREDICTION_WINDOW_SIZE = 30
 THRESHOLD = 0.12
@@ -107,43 +109,82 @@ class PlayerHWAccel:
 
     def segment_move(self, action_window):
         # find statistical features of action and feed it to model
+        window_fft = np.fft.fft(action_window, axis=0)
 
         action = {
-            "acc_x_mean": action_window[:, 0].mean(),
-            "acc_x_std": action_window[:, 0].std(),
-            "acc_x_rms": self.rmsValue(action_window, 0),
-            "acc_x_min": action_window[:, 0].min(),
-            "acc_x_max": action_window[:, 0].max(),
-            "acc_y_mean": action_window[:, 1].mean(),
-            "acc_y_std": action_window[:, 1].std(),
-            "acc_y_rms": self.rmsValue(action_window, 1),
-            "acc_y_min": action_window[:, 1].min(),
-            "acc_y_max": action_window[:, 1].max(),
-            "acc_z_mean": action_window[:, 2].mean(),
-            "acc_z_std": action_window[:, 2].std(),
-            "acc_z_rms": self.rmsValue(action_window, 2),
-            "acc_z_min": action_window[:, 2].min(),
-            "acc_z_max": action_window[:, 2].max(),
-            "gyro_x_mean": action_window[:, 3].mean(),
-            "gyro_x_std": action_window[:, 3].std(),
-            "gyro_x_rms": self.rmsValue(action_window, 3),
-            "gyro_x_min": action_window[:, 3].min(),
-            "gyro_x_max": action_window[:, 3].max(),
-            "gyro_y_mean": action_window[:, 4].mean(),
-            "gyro_y_std": action_window[:, 4].std(),
-            "gyro_y_rms": self.rmsValue(action_window, 4),
-            "gyro_y_min": action_window[:, 4].min(),
-            "gyro_y_max": action_window[:, 4].max(),
-            "gyro_z_mean": action_window[:, 5].mean(),
-            "gyro_z_std": action_window[:, 5].std(),
-            "gyro_z_rms": self.rmsValue(action_window, 5),
-            "gyro_z_min": action_window[:, 5].min(),
-            "gyro_z_max": action_window[:, 5].max(),
+        "acc_x_mean":action_window[:, 0].mean(),
+        "acc_x_std":action_window[:, 0].std(),
+        "acc_x_rms":self.rmsValue(action_window, 0),
+        "acc_x_kurt":kurtosis(action_window[:, 0]),
+        "acc_x_skew":skew(action_window[:, 0]),
+        "acc_x_iqr":np.percentile(action_window[:, 0], 75) - np.percentile(action_window[:, 0], 25),
+        "acc_x_mad":np.median(np.absolute(action_window[:,0] - np.median(action_window[:,0]))),
+        "acc_x_fmean":window_fft[:, 0].mean().real,
+        "acc_x_frange":(window_fft[:, 0].max() - window_fft[:,0].min()).real,
+        "acc_x_fskew":skew(window_fft[:, 0]).real,
+
+        "acc_y_mean":action_window[:, 1].mean(),
+        "acc_y_std":action_window[:, 1].std(),
+        "acc_y_rms":self.rmsValue(action_window, 1),
+        "acc_y_kurt":kurtosis(action_window[:, 1]),
+        "acc_y_skew":skew(action_window[:, 1]),
+        "acc_y_iqr":np.percentile(action_window[:, 1], 75) - np.percentile(action_window[:, 1], 25),
+        "acc_y_mad":np.median(np.absolute(action_window[:,1] - np.median(action_window[:,1]))),
+        "acc_y_fmean":window_fft[:, 1].mean().real,
+        "acc_y_frange":(window_fft[:, 1].max() - window_fft[:,1].min()).real,
+        "acc_y_fskew":skew(window_fft[:, 1]).real,
+
+        "acc_z_mean":action_window[:, 2].mean(),
+        "acc_z_std":action_window[:, 2].std(),
+        "acc_z_rms":self.rmsValue(action_window, 2),
+        "acc_z_kurt":kurtosis(action_window[:, 2]),
+        "acc_z_skew":skew(action_window[:, 2]),
+        "acc_z_iqr":np.percentile(action_window[:, 2], 75) - np.percentile(action_window[:, 2], 25),
+        "acc_z_mad":np.median(np.absolute(action_window[:,2] - np.median(action_window[:,2]))),
+        "acc_z_fmean":window_fft[:, 2].mean().real,
+        "acc_z_frange":(window_fft[:, 2].max() - window_fft[:,2].min()).real,
+        "acc_z_fskew":skew(window_fft[:, 2]).real,
+
+        "gyro_x_mean":action_window[:, 3].mean(),
+        "gyro_x_std":action_window[:, 3].std(),
+        "gyro_x_rms":self.rmsValue(action_window, 3),
+        "gyro_x_kurt":kurtosis(action_window[:, 3]),
+        "gyro_x_skew":skew(action_window[:, 3]),
+        "gyro_x_iqr":np.percentile(action_window[:, 3], 75) - np.percentile(action_window[:, 3], 25),
+        "gyro_x_mad":np.median(np.absolute(action_window[:,3] - np.median(action_window[:,3]))),
+        "gyro_x_fmean":window_fft[:, 3].mean().real,
+        "gyro_x_frange":(window_fft[:, 3].max() - window_fft[:,3].min()).real,
+        "gyro_x_fskew":skew(window_fft[:, 3]).real,
+
+        "gyro_y_mean":action_window[:, 4].mean(),
+        "gyro_y_std":action_window[:, 4].std(),
+        "gyro_y_rms":self.rmsValue(action_window, 4),
+        "gyro_y_kurt":kurtosis(action_window[:, 4]),
+        "gyro_y_skew":skew(action_window[:, 4]),
+        "gyro_y_iqr":np.percentile(action_window[:, 4], 75) - np.percentile(action_window[:, 4], 25),
+        "gyro_y_mad":np.median(np.absolute(action_window[:,4] - np.median(action_window[:,4]))),
+        "gyro_y_fmean":window_fft[:, 4].mean().real,
+        "gyro_y_frange":(window_fft[:, 4].max() - window_fft[:,4].min()).real,
+        "gyro_y_fskew":skew(window_fft[:, 4]).real,
+
+        "gyro_z_mean":action_window[:, 5].mean(),
+        "gyro_z_std":action_window[:, 5].std(),
+        "gyro_z_rms":self.rmsValue(action_window, 5),
+        "gyro_z_kurt":kurtosis(action_window[:, 5]),
+        "gyro_z_skew":skew(action_window[:, 5]),
+        "gyro_z_iqr":np.percentile(action_window[:, 5], 75) - np.percentile(action_window[:, 5], 25),
+        "gyro_z_mad":np.median(np.absolute(action_window[:,5] - np.median(action_window[:,5]))),
+        "gyro_z_fmean":window_fft[:, 5].mean().real,
+        "gyro_z_frange":(window_fft[:, 5].max() - window_fft[:,5].min()).real,
+        "gyro_z_fskew":skew(window_fft[:, 5]).real
         }
 
         action_features = np.array(list(action.values()))
 
-        for i, value in enumerate(action_features):
+        # final model input is 16 features after doing dimensionality reduction
+        model_input = self.feature_reduction(action_features)
+
+        for i, value in enumerate(model_input):
             self.in_buffer[i] = value
 
         self.dma.sendchannel.transfer(self.in_buffer)
@@ -151,8 +192,7 @@ class PlayerHWAccel:
 
         self.dma.sendchannel.wait()
         self.dma.recvchannel.wait()
-
-        # self.out_buffer = self.pickled_model.predict(self.in_buffer)
+        
         prediction = Actions.glove[np.argmax(self.out_buffer)]
         print("prediction:", prediction)
         return prediction
@@ -174,7 +214,21 @@ class PlayerHWAccel:
         root = math.sqrt(mean)
 
         return root
+    
+    def feature_reduction(action_features):
+        # reduce 60 action features to 16 using PCA
 
+        action_features = np.reshape(action_features, (1, NUMBER_OF_ACTION_FEATURES))
+
+        with open('scaler.pkl', 'rb') as pickle_file:
+            scaler = pickle.load(pickle_file)
+
+        with open('pca.pkl', 'rb') as pickle_file:
+            pca = pickle.load(pickle_file)
+
+        pca_action_features = pca.transform(scaler.transform(action_features))
+
+        return pca_action_features
 
 class HWAccel:
     def __init__(
