@@ -23,13 +23,13 @@ const int IR_SEND_PIN = 3;  // IR transmitter at pin D3
 const int buzzerPin = 5;    //buzzer at pin D5
 int buttonState = 0;
 
-const uint16_t PLAYER_1_ADDRESS = 0x0102;
-const uint16_t PLAYER_2_ADDRESS = 0x0105;
-const uint8_t command = 0x01; //1 for player 1
+const uint16_t PLAYER_1_ADDRESS = '1';
+const uint16_t PLAYER_2_ADDRESS = '2';
+const uint8_t command = 'G'; //1 for player 1
 
 uint8_t ammoStatus = 0;
 uint8_t repeats = 1;
-uint8_t bulletCount = 0;
+uint8_t bulletCount = 6;
 unsigned long sensorDelayStartTime = 0;
 byte sendDataPacket = false;
 

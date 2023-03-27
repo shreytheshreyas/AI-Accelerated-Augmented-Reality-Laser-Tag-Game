@@ -1,22 +1,18 @@
-import csv
 import json
 import logging
 import struct
+import sys
 import threading
-import time
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from os import system
 from queue import Queue
 
-from bluepy.btle import (
-    ADDR_TYPE_RANDOM,
-    BTLEDisconnectError,
-    DefaultDelegate,
-    Peripheral,
-)
+from bluepy.btle import BTLEDisconnectError, DefaultDelegate, Peripheral
 from client import LaptopClient
+
+PORT = 8081
+LOCAL_TEST = False
 
 CHARACTERISTIC = "0000dfb1-0000-1000-8000-00805f9b34fb"
 
@@ -517,13 +513,9 @@ class BluetoothInterfaceHandler(DefaultDelegate):
 
                     if chr(packetType) == VEST:
                         vestData = struct.unpack("B", packetData[2:3])[0]
-                        print(f"vest data received = {vestData}")
 
                         if vestData > 0:
-                            print(f"Player health {vestData}")
-                        else:
-                            # Should not be the case
-                            print("Player is dead")
+                            print(f"Player health before shot {vestData}")
                         # Send hit either ways
                         self.laptopClient.send_plaintext("hit")
 
@@ -582,7 +574,7 @@ class BlunoDevice:
         self.macAddress = macAddress
         self.peripheral = None
         self.blutoothInterfaceHandler = None
-        self.laptopClient = LaptopClient("192.168.95.250", 8082)
+        self.laptopClient = LaptopClient("192.168.95.250", PORT)
         self.connectedToUltra = False
 
     # data should be string format of ascii
@@ -599,10 +591,13 @@ class BlunoDevice:
             )
 
     def connect_to_ultra96(self):
+        if LOCAL_TEST:
+            return
         self.laptopClient.connect()
         self.laptopClient.send_plaintext(PLAYER_JSON_DATA[self.beetleId])
         receivedMessage = ""
         avail = False
+        first = ""
         while not avail:
             avail, first = self.laptopClient.available()
 
@@ -613,6 +608,8 @@ class BlunoDevice:
         self.connectedToUltra = True
 
     def close_connection_to_ultra96(self):
+        if LOCAL_TEST:
+            return
         self.laptopClient.close()
         logging.info(f"Closed connection between relay node and ultra-96")
         self.connectedToUltra = False
@@ -733,6 +730,13 @@ class BlunoDevice:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) >= 2:
+        for arg in sys.argv[1:]:
+            if arg == "local":
+                LOCAL_TEST = True
+            elif arg.isdigit():
+                PORT = int(arg)
+
     format = "%(asctime)s: %(message)s"
     logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
 
@@ -771,23 +775,23 @@ if __name__ == "__main__":
 
     try:
         # Starting beetle Threads
-        beetleThread0.start()
+        # beetleThread0.start()
         # beetleThread1.start()
-        beetleThread2.start()
+        # beetleThread2.start()
         beetleThread3.start()
         # beetleThread4.start()
-        beetleThread5.start()
+        # beetleThread5.start()
         # beetleThread6.start()
         # beetleThread7.start()
         # beetleThread8.start()
 
         # Terminating beetle Threads
-        beetleThread0.join()
+        # beetleThread0.join()
         # beetleThread1.join()
-        beetleThread2.join()
+        # beetleThread2.join()
         beetleThread3.join()
         # beetleThread4.join()
-        beetleThread5.join()
+        # beetleThread5.join()
         # beetleThread6.join()
         # beetleThread7.join()
         # beetleThread8.join()

@@ -41,8 +41,8 @@ unsigned long sensorDelayStartTime = 0;
 int i;
 
 const uint8_t DEAD[] = {
-    SEG_A | SEG_B | SEG_C | SEG_D | SEG_E,   // D
-    SEG_A | SEG_D | SEG_E | SEG_F | SEG_G,   // E
+    SEG_A | SEG_B | SEG_C | SEG_D | SEG_E,           // D
+    SEG_A | SEG_D | SEG_E | SEG_F | SEG_G,           // E
     SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,   // A
     SEG_A | SEG_B | SEG_C | SEG_D | SEG_E            // D
 };
@@ -207,21 +207,25 @@ void loop() {
         communicationProtocol->start_communication();
         return;
     }
-    /* for (i = 0; i < IR_RATIO; ++i) { */
     if (IrReceiver.decode()) {
+        /* if (IrReceiver.decodedIRData.command == 'G') {   //if hit by player 2's shot */
+        int shotID = IrReceiver.decodedIRData.command;  //shotID of the player that hit you
+        int addr = IrReceiver.decodedIRData.address;  //shotID of the player that hit you
+        Serial.write('H');
+        Serial.write(shotID);
+        Serial.write(addr);
 
-        /* if (IrReceiver.decodedIRData.command == 0x01) {   //if hit by player 2's shot */
-        shotID = IrReceiver.decodedIRData.command;  //shotID of the player that hit you
-        sendData = true;
+        /* sendData = true; */
+        /* communicationProtocol->initialize_packet_data(); */
+        /* communicationProtocol->send_data(); */
+
         health -= 10;
         tone(BUZZER_PIN,5000,100);
         display.showNumberDec(health);
         sensorDelayStartTime = millis();
         sensorDelay(100);
 
-        communicationProtocol->initialize_packet_data();
-        communicationProtocol->send_data();
-        /* Serial.Println(shotID); */
+        sendData = true;
 
         if (health == 0) {
             display.setSegments(DEAD);
@@ -231,17 +235,16 @@ void loop() {
             health = 100;
             display.showNumberDec(health);
         }
-        /* } */
         IrReceiver.begin(IR_RCV_PIN); //continue receiving IR signals
-        /* IrReceiver.resume(); */
+        /* } */
     }
-    /* } */
     if (Serial.available()) {
         int data = Serial.read();
-        //Serial.print(data);
+        Serial.write(data);
+        if ((char)data == '\n') {
+            return;
+        }
         if ((char)data == RST) {
-            //Serial.print("bytes match");
-            //Serial.write('M');
             hasHandshakeStarted = false;
             hasHandshakeEnded = false;
             Serial.write(RST);
@@ -253,10 +256,9 @@ void loop() {
         }
         sensorDelayStartTime = millis();
         sensorDelay(50);
-        int newHealth = data;
-        tone(BUZZER_PIN,5000,100);
-        if (health != newHealth) {
-            health = newHealth;
+        if (health != data) {
+            tone(BUZZER_PIN,5000,100);
+            health = data;
             display.showNumberDec(health);
         }
     }
