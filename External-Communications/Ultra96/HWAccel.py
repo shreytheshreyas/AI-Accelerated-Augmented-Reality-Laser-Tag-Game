@@ -23,6 +23,8 @@ class PlayerHWAccel:
         in_queue,
         out_queue,
         dma,
+        scaler_file,
+        pca_file,
     ):
         self.prev = 0
         self.count = 0
@@ -32,6 +34,15 @@ class PlayerHWAccel:
 
         self.in_queue = in_queue
         self.out_queue = out_queue
+
+        with open(scaler_file, 'rb') as pickle_file:
+            scaler = pickle.load(pickle_file)
+
+        with open(pca_file, 'rb') as pickle_file:
+            pca = pickle.load(pickle_file)
+
+        self.scaler = scaler
+        self.pca = pca
 
         self.in_buffer = pynq.allocate(shape=(INPUT_SIZE,), dtype=np.double)
         self.out_buffer = pynq.allocate(shape=(OUTPUT_SIZE,), dtype=np.double)
@@ -181,7 +192,7 @@ class PlayerHWAccel:
 
         action_features = np.array(list(action.values()))
 
-        # final model input is 16 features after doing dimensionality reduction
+        # final model input is 16 features after dimensionality reduction
         model_input = self.feature_reduction(action_features)
 
         for i, value in enumerate(model_input):
@@ -215,18 +226,12 @@ class PlayerHWAccel:
 
         return root
     
-    def feature_reduction(action_features):
+    def feature_reduction(self, action_features):
         # reduce 60 action features to 16 using PCA
 
         action_features = np.reshape(action_features, (1, NUMBER_OF_ACTION_FEATURES))
 
-        with open('scaler.pkl', 'rb') as pickle_file:
-            scaler = pickle.load(pickle_file)
-
-        with open('pca.pkl', 'rb') as pickle_file:
-            pca = pickle.load(pickle_file)
-
-        pca_action_features = pca.transform(scaler.transform(action_features))
+        pca_action_features = self.pca.transform(self.scaler.transform(action_features))
 
         return pca_action_features
 
@@ -248,5 +253,11 @@ class HWAccel:
         self.dma_p1 = self.overlay.axi_dma_0
         self.dma_p2 = self.overlay.axi_dma_1
 
-        self.p1 = PlayerHWAccel(self.in_queue_p1, self.out_queue_p1, self.dma_p1)
-        self.p2 = PlayerHWAccel(self.in_queue_p2, self.out_queue_p2, self.dma_p2)
+        self.scaler_p1 = 'scaler.pkl'
+        self.scaler_p2 = 'scaler_left.pkl'
+
+        self.pca_p1 = 'pca.pkl'
+        self.pca_p2 = 'pca_left.pkl'
+
+        self.p1 = PlayerHWAccel(self.in_queue_p1, self.out_queue_p1, self.dma_p1, self.scaler_p1, self.pca_p1)
+        self.p2 = PlayerHWAccel(self.in_queue_p2, self.out_queue_p2, self.dma_p2, self.scaler_p2, self.pca_p2)
