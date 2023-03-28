@@ -28,8 +28,8 @@ const uint16_t PLAYER_2_ADDRESS = '2';
 const uint8_t command = 'G'; //1 for player 1
 
 uint8_t ammoStatus = 0;
-uint8_t repeats = 1;
-uint8_t bulletCount = 6;
+uint8_t repeats = 2;
+uint8_t bulletCount = 100;
 unsigned long sensorDelayStartTime = 0;
 byte sendDataPacket = false;
 
@@ -212,7 +212,7 @@ void loop() {
         sendDataPacket = true;
         ammoStatus = 1;
 
-        if (bulletCount == 6) {
+        if (bulletCount >= 6) {
             tone(buzzerPin,NOTE_C6,100);
         } else if (bulletCount == 5) {
             tone(buzzerPin,NOTE_D6,100);

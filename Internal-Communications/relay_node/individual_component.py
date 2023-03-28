@@ -775,23 +775,23 @@ if __name__ == "__main__":
 
     try:
         # Starting beetle Threads
-        # beetleThread0.start()
-        # beetleThread1.start()
-        # beetleThread2.start()
+        beetleThread0.start()
+        beetleThread1.start()
+        beetleThread2.start()
         beetleThread3.start()
-        # beetleThread4.start()
-        # beetleThread5.start()
+        beetleThread4.start()
+        beetleThread5.start()
         # beetleThread6.start()
         # beetleThread7.start()
         # beetleThread8.start()
 
         # Terminating beetle Threads
-        # beetleThread0.join()
-        # beetleThread1.join()
-        # beetleThread2.join()
+        beetleThread0.join()
+        beetleThread1.join()
+        beetleThread2.join()
         beetleThread3.join()
-        # beetleThread4.join()
-        # beetleThread5.join()
+        beetleThread4.join()
+        beetleThread5.join()
         # beetleThread6.join()
         # beetleThread7.join()
         # beetleThread8.join()

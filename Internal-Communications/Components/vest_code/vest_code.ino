@@ -151,7 +151,6 @@ void Protocol::start_communication() {
     case RST:
         hasHandshakeStarted = false;
         hasHandshakeEnded = false;
-//                this->clear_serial_buffer();
         Serial.write(RST);
         break;
 
@@ -208,39 +207,34 @@ void loop() {
         return;
     }
     if (IrReceiver.decode()) {
-        /* if (IrReceiver.decodedIRData.command == 'G') {   //if hit by player 2's shot */
-        int shotID = IrReceiver.decodedIRData.command;  //shotID of the player that hit you
-        int addr = IrReceiver.decodedIRData.address;  //shotID of the player that hit you
-        Serial.write('H');
-        Serial.write(shotID);
-        Serial.write(addr);
-
-        /* sendData = true; */
-        /* communicationProtocol->initialize_packet_data(); */
-        /* communicationProtocol->send_data(); */
-
-        health -= 10;
-        tone(BUZZER_PIN,5000,100);
-        display.showNumberDec(health);
+        sensorDelay(500);
         sensorDelayStartTime = millis();
-        sensorDelay(100);
+        if (IrReceiver.decodedIRData.command == 'G') {
+            sendData = true;
+            communicationProtocol->initialize_packet_data();
+            communicationProtocol->send_data();
 
-        sendData = true;
-
-        if (health == 0) {
-            display.setSegments(DEAD);
-            deadTune();
-            sensorDelayStartTime = millis();
-            sensorDelay(1000);
-            health = 100;
+            health -= 10;
+            tone(BUZZER_PIN,5000,100);
             display.showNumberDec(health);
+            sensorDelayStartTime = millis();
+            sensorDelay(500);
+
+            sendData = true;
+
+            if (health == 0) {
+                display.setSegments(DEAD);
+                deadTune();
+                sensorDelayStartTime = millis();
+                sensorDelay(1000);
+                health = 100;
+                display.showNumberDec(health);
+            }
         }
         IrReceiver.begin(IR_RCV_PIN); //continue receiving IR signals
-        /* } */
     }
     if (Serial.available()) {
         int data = Serial.read();
-        Serial.write(data);
         if ((char)data == '\n') {
             return;
         }
@@ -254,12 +248,13 @@ void loop() {
         if (data == 125) {
             data = 130;
         }
-        sensorDelayStartTime = millis();
-        sensorDelay(50);
         if (health != data) {
             tone(BUZZER_PIN,5000,100);
             health = data;
             display.showNumberDec(health);
         }
+        sensorDelayStartTime = millis();
+        sensorDelay(200);
+        IrReceiver.begin(IR_RCV_PIN); // CANNOT REMOVE
     }
 }
