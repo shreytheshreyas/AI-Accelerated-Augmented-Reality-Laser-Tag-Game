@@ -42,15 +42,15 @@ GUN = "G"  # The ASCII code associated with G is 71
 VEST = "V"  # The ASCII code associated with V is 86
 
 PLAYER_JSON_DATA = [
-    '{"player": "p1", "sensor": "gun"}',
-    '{"player": "p1", "sensor": "vest"}',
-    '{"player": "p1", "sensor": "glove"}',
-    '{"player": "p2", "sensor": "gun"}',
-    '{"player": "p2", "sensor": "vest"}',
-    '{"player": "p2", "sensor": "glove"}',
-    '{"player": "p1", "sensor": "gun"}',
-    '{"player": "p2", "sensor": "vest"}',
-    '{"player": "p2", "sensor": "glove"}',
+    "p1_gun",
+    "p1_vest",
+    "p1_glove",
+    "p2_gun",
+    "p2_vest",
+    "p2_glove",
+    "p1_gun",
+    "p2_vest",
+    "p2_glove",
 ]
 
 MAC_ADDRESSES = {
@@ -542,6 +542,9 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         imuDataFeatureVector["imuDataGyroAccelZ"] = (
                             struct.unpack(">h", packetData[12:14])[0] / 128
                         )
+
+                        # DATA COLLECTION
+                        # ==========================================
                         # imuDataFeatureVector['label'] = 'grenade'
                         # imuDataFeatureVector["label"] = "shield"
                         # imuDataFeatureVector['label'] = 'reload'
@@ -632,10 +635,9 @@ class BlunoDevice:
             )
 
     def reset_controller(self):
-        print("Sending RST")
         try:
             self.transmit_packet(RST)
-            self.peripheral.waitForNotifications(1.0)
+            self.peripheral.waitForNotifications(0.01)
         except (BTLEDisconnectError, AttributeError):
             pass
         except Exception as e:
@@ -647,7 +649,7 @@ class BlunoDevice:
         print("Start of handshake protocol")
         if StatusManager.get_connection_status(self.beetleId):
             self.transmit_packet(SYNC)
-            self.peripheral.waitForNotifications(1.0)
+            self.peripheral.waitForNotifications(0.01)
 
             if StatusManager.get_sync_status(self.beetleId):
                 self.transmit_packet(ACK)
@@ -655,10 +657,11 @@ class BlunoDevice:
                 isHandshakeCompleted = True
                 logging.info(f"Handshake Completed for beetle-{self.beetleId}\n")
 
-        print("End of handshake protocol", isHandshakeCompleted)
+        # print("End of handshake protocol", isHandshakeCompleted)
         return isHandshakeCompleted
 
     def transmission_protocol(self, isReceiver):
+        self.connect_to_ultra96()
         isHandshakeCompleted = False
         while True:
             try:
@@ -676,7 +679,7 @@ class BlunoDevice:
                     )
 
                     if isHandshakeCompleted:
-                        self.connect_to_ultra96()
+                        self.laptopClient.send_plaintext("start")
                 else:
                     if isReceiver:
                         avail, first = self.laptopClient.available()
@@ -725,8 +728,7 @@ class BlunoDevice:
                 StatusManager.clear_data_nack_status(self.beetleId)
 
                 if self.connectedToUltra:
-                    self.close_connection_to_ultra96()
-                pass
+                    self.laptopClient.send_plaintext("end")
 
 
 if __name__ == "__main__":
@@ -775,9 +777,9 @@ if __name__ == "__main__":
 
     try:
         # Starting beetle Threads
-        beetleThread0.start()
-        beetleThread1.start()
-        beetleThread2.start()
+        # beetleThread0.start()
+        # beetleThread1.start()
+        # beetleThread2.start()
         beetleThread3.start()
         beetleThread4.start()
         beetleThread5.start()
@@ -786,9 +788,9 @@ if __name__ == "__main__":
         # beetleThread8.start()
 
         # Terminating beetle Threads
-        beetleThread0.join()
-        beetleThread1.join()
-        beetleThread2.join()
+        # beetleThread0.join()
+        # beetleThread1.join()
+        # beetleThread2.join()
         beetleThread3.join()
         beetleThread4.join()
         beetleThread5.join()
