@@ -637,7 +637,7 @@ class BlunoDevice:
     def reset_controller(self):
         try:
             self.transmit_packet(RST)
-            self.peripheral.waitForNotifications(0.01)
+            self.peripheral.waitForNotifications(0.1)
         except (BTLEDisconnectError, AttributeError):
             pass
         except Exception as e:
@@ -649,7 +649,7 @@ class BlunoDevice:
         print("Start of handshake protocol")
         if StatusManager.get_connection_status(self.beetleId):
             self.transmit_packet(SYNC)
-            self.peripheral.waitForNotifications(0.01)
+            self.peripheral.waitForNotifications(0.1)
 
             if StatusManager.get_sync_status(self.beetleId):
                 self.transmit_packet(ACK)
@@ -777,9 +777,9 @@ if __name__ == "__main__":
 
     try:
         # Starting beetle Threads
-        # beetleThread0.start()
-        # beetleThread1.start()
-        # beetleThread2.start()
+        beetleThread0.start()
+        beetleThread1.start()
+        beetleThread2.start()
         beetleThread3.start()
         beetleThread4.start()
         beetleThread5.start()
@@ -788,9 +788,9 @@ if __name__ == "__main__":
         # beetleThread8.start()
 
         # Terminating beetle Threads
-        # beetleThread0.join()
-        # beetleThread1.join()
-        # beetleThread2.join()
+        beetleThread0.join()
+        beetleThread1.join()
+        beetleThread2.join()
         beetleThread3.join()
         beetleThread4.join()
         beetleThread5.join()

@@ -207,8 +207,8 @@ void loop() {
         return;
     }
     if (IrReceiver.decode()) {
-        sensorDelay(500);
-        sensorDelayStartTime = millis();
+        /* sensorDelay(); */
+        /* sensorDelayStartTime = millis(); */
         if (IrReceiver.decodedIRData.command == 'G') {
             sendData = true;
             communicationProtocol->initialize_packet_data();
@@ -217,11 +217,8 @@ void loop() {
             health -= 10;
             tone(BUZZER_PIN,5000,100);
             display.showNumberDec(health);
-            sensorDelayStartTime = millis();
-            sensorDelay(500);
 
             sendData = true;
-
             if (health == 0) {
                 display.setSegments(DEAD);
                 deadTune();
