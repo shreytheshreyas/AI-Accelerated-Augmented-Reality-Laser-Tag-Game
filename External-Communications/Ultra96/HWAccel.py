@@ -21,14 +21,7 @@ THRESHOLD = 0.12
 
 
 class PlayerHWAccel:
-    def __init__(
-        self,
-        in_queue,
-        out_queue,
-        dma,
-        scaler_file,
-        pca_file,
-    ):
+    def __init__(self, in_queue, out_queue, dma, scaler_file, pca_file, logs_queue):
         self.prev = 0
         self.count = 0
         self.total = 0
@@ -37,6 +30,7 @@ class PlayerHWAccel:
 
         self.in_queue = in_queue
         self.out_queue = out_queue
+        self.logs_queue = logs_queue
 
         with open(scaler_file, "rb") as pickle_file:
             scaler = pickle.load(pickle_file)
@@ -221,7 +215,7 @@ class PlayerHWAccel:
         self.dma.recvchannel.wait()
 
         prediction = Actions.glove[np.argmax(self.out_buffer)]
-        print("prediction:", prediction)
+        self.logs_queue.put("prediction:", prediction)
         return prediction
 
     def rmsValue(self, arr, col):
@@ -248,8 +242,7 @@ class PlayerHWAccel:
         action_features = np.reshape(action_features, (1, NUMBER_OF_ACTION_FEATURES))
 
         pca_action_features = np.reshape(
-            self.pca.transform(self.scaler.transform(action_features)),
-            (INPUT_SIZE,)
+            self.pca.transform(self.scaler.transform(action_features)), (INPUT_SIZE,)
         )
 
         return pca_action_features
@@ -262,11 +255,13 @@ class HWAccel:
         in_queue_p2,
         out_queue_p1,
         out_queue_p2,
+        logs_queue,
     ):
         self.in_queue_p1 = in_queue_p1
         self.in_queue_p2 = in_queue_p2
         self.out_queue_p1 = out_queue_p1
         self.out_queue_p2 = out_queue_p2
+        self.logs_queue = logs_queue
 
         self.overlay = pynq.Overlay("mlp_fpga_design.bit")
 
@@ -285,6 +280,7 @@ class HWAccel:
             self.dma_p1,
             self.scaler_p1,
             self.pca_p1,
+            self.logs_queue,
         )
         self.p2 = PlayerHWAccel(
             self.in_queue_p2,
@@ -292,4 +288,5 @@ class HWAccel:
             self.dma_p2,
             self.scaler_p2,
             self.pca_p2,
+            self.logs_queue,
         )

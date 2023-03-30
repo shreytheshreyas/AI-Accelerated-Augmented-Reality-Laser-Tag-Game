@@ -20,6 +20,9 @@ class GameEngine:
         eval_req_queue,
         eval_resp_queue,
         vis_queue,
+        eval_req_console_queue,
+        eval_resp_console_queue,
+        logs_queue,
     ):
         self.game_state = GameState()
         self.action_queue = action_queue
@@ -28,6 +31,9 @@ class GameEngine:
         self.eval_resp_queue = eval_resp_queue
         self.vis_queue = vis_queue
         self.opp_in_frames = opp_in_frames
+        self.eval_req_console_queue = eval_req_console_queue
+        self.eval_resp_console_queue = eval_resp_console_queue
+        self.logs_queue = logs_queue
         self.signals = {}
         self.complete = {}
         self.turn_end_time = 0.0
@@ -86,18 +92,18 @@ class GameEngine:
     def is_complete(self):
         if TWO_PLAYER:
             if self.complete["p1"] and self.complete["p2"]:
-                print("Both complete")
+                self.logs_queue.put("Both complete")
                 return True
-            # print("Not both complete")
+            # self.logs_queue.put("Not both complete")
             return False
 
         return self.complete["p1"] or self.complete["p2"]
 
     def is_turn_over(self):
         self.turn_time_left = self.turn_end_time - time.time()
-        # print(f"Checking is turn over, time left = {self.turn_time_left}")
-        if self.turn_time_left <= 0:
-            print("turn is over")
+        # self.logs_queue.put(f"Checking is turn over, time left = {self.turn_time_left}")
+        # if self.turn_time_left <= 0:
+        # self.logs_queue.put("turn is over")
 
         return self.turn_time_left <= 0
 
@@ -108,25 +114,28 @@ class GameEngine:
         )
 
     def run(self):
+        game_state = self.game_state.get_dict()
+        self.eval_req_console_queue.put(game_state)
+        self.eval_resp_console_queue.put(game_state)
         self.reset_turn()
         game_start = True
 
         while game_start:
             if not self.action_queue.empty():
-                # print("Getting from action queue")
+                # self.logs_queue.put("Getting from action queue")
                 player, action = self.action_queue.get()
                 opp = self.get_opp(player)
-                print(player, action)
+                self.logs_queue.put(player, action)
 
                 # If new connection, action will be 'conn_<sensor>'
                 conn_list = action.split("_", 1)
                 if conn_list[0] == "conn":
-                    print("New conn in gameengine")
+                    self.logs_queue.put("New conn in gameengine")
                     sensor = conn_list[1]
                     data = getattr(
                         getattr(self.game_state, player), SENSOR_MAPPING[sensor]
                     )
-                    print(SENSOR_MAPPING[sensor], "=", data)
+                    self.logs_queue.put(SENSOR_MAPPING[sensor], "=", data)
                     self.update_beetle_queue.put((player + "_" + sensor, str(data)))
                     continue
 
@@ -174,16 +183,18 @@ class GameEngine:
 
                 game_state = self.game_state.get_dict()
 
-                # print("[Game State Sent]:\n" + json.dumps(game_state, indent=4))
+                # self.logs_queue.put("[Game State Sent]:\n" + json.dumps(game_state, indent=4))
                 self.eval_req_queue.put(game_state)
+                self.eval_req_console_queue.put(game_state)
                 updated_game_state = self.eval_resp_queue.get()
+                self.eval_resp_console_queue.put(updated_game_state)
 
                 self.update_players(updated_game_state)
 
                 # Empty queue
                 while not self.action_queue.empty():
                     self.action_queue.get()
-                # print(
+                # self.logs_queue.put(
                 #     "[Game State Updated]:\n"
                 #     + json.dumps(self.game_state.get_dict(), indent=4)
                 # )

@@ -21,15 +21,26 @@ SENSOR_MAPPING = {"gun": "bullets", "vest": "hp"}
 
 
 class RelayServer:
-    def __init__(self, host, port, action_queue, update_beetle_queue):
+    def __init__(
+        self,
+        host,
+        port,
+        action_queue,
+        update_beetle_queue,
+        connected,
+        action_console_queue,
+        logs_queue,
+    ):
         self.host = host
         self.port = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         self.edit_conn_queue = mp.Queue()
-        self.connected = mp.Array("i", [False] * 6)
+        self.connected = connected
         self.action_queue = action_queue
+        self.action_console_queue = action_console_queue
         self.update_beetle_queue = update_beetle_queue
+        self.logs_queue = logs_queue
 
         self.glove_in_queue = {
             "p1": mp.Queue(),
@@ -45,6 +56,7 @@ class RelayServer:
             self.glove_in_queue["p2"],
             self.glove_out_queue["p1"],
             self.glove_out_queue["p2"],
+            self.logs_queue,
         )
 
     def recv_msg(self, conn):
@@ -59,7 +71,7 @@ class RelayServer:
                     break
                 data += _d
             if len(data) == 0:
-                print("no more data from the client")
+                self.logs_queue.put("no more data from the client")
                 return None
 
             data = data.decode("utf8")
@@ -73,13 +85,13 @@ class RelayServer:
                     break
                 data += _d
             if len(data) == 0:
-                print("no more data from the client")
+                self.logs_queue.put("no more data from the client")
                 return None
 
             msg = data.decode("utf8")
 
         except ConnectionResetError:
-            print("Connection Reset")
+            self.logs_queue.put("Connection Reset")
             return None
 
         return msg
@@ -92,7 +104,7 @@ class RelayServer:
             conn.sendall(m.encode("utf-8"))
             conn.sendall(plaintext.encode("utf-8"))
         except OSError:
-            print("Connection terminated")
+            self.logs_queue.put("Connection terminated")
             success = False
         return success
 
@@ -111,14 +123,18 @@ class RelayServer:
 
             if not self.update_beetle_queue.empty():
                 component, data = self.update_beetle_queue.get()
-                print(f"Get from update beetle queue [{data}] {component}")
+                self.logs_queue.put(
+                    f"Get from update beetle queue [{data}] {component}"
+                )
                 time.sleep(0.2)
                 with self.connected.get_lock():
                     if self.connected[COMPONENT_IDS[component]]:
-                        print(f"Sending data [{data}] to {component}")
+                        self.logs_queue.put(f"Sending data [{data}] to {component}")
                         self.send_plaintext(str(data), conns[component])
                     else:
-                        print(f"Could not send data [{data}] to {component}")
+                        self.logs_queue.put(
+                            f"Could not send data [{data}] to {component}"
+                        )
 
     def update_conn_status(self, msg, component):
         if msg == "start":
@@ -126,16 +142,16 @@ class RelayServer:
                 self.connected[COMPONENT_IDS[component]] = True
                 player, sensor = component.split("_")
                 if sensor == "gun" or sensor == "vest":
-                    print("put connn in action queue")
+                    self.logs_queue.put("put connn in action queue")
                     self.action_queue.put((player, "conn_" + sensor))
 
-                print(f"Connected to {component}")
+                self.logs_queue.put(f"Connected to {component}")
             return True
 
         if msg == "end":
             with self.connected.get_lock():
                 self.connected[COMPONENT_IDS[component]] = False
-                print(f"Disconnected from {component}")
+                self.logs_queue.put(f"Disconnected from {component}")
             return True
 
         return False
@@ -148,15 +164,16 @@ class RelayServer:
             if self.update_conn_status(msg, component):
                 continue
             if msg != "shoot":
-                print("wrong action (gun)")
+                self.logs_queue.put("wrong action (gun)")
                 continue
 
             self.action_queue.put((player, "shoot"))
+            self.action_console_queue.put((player, "shoot"))
 
         conn.close()
         with self.connected.get_lock():
             self.connected[COMPONENT_IDS[component]] = False
-            print(f"Disconnected from {component}")
+            self.logs_queue.put(f"Disconnected from {component}")
 
     def handle_vest_conn(self, conn, player, component):
         while True:
@@ -167,15 +184,16 @@ class RelayServer:
                 continue
 
             if msg != "hit":
-                print("wrong action (vest)")
+                self.logs_queue.put("wrong action (vest)")
                 continue
 
             self.action_queue.put((player, "hit"))
+            self.action_console_queue.put((player, "hit"))
 
         conn.close()
         with self.connected.get_lock():
             self.connected[COMPONENT_IDS[component]] = False
-            print(f"Disconnected from {component}")
+            self.logs_queue.put(f"Disconnected from {component}")
 
     def handle_glove_conn(self, conn, in_queue, out_queue, player, component):
         while True:
@@ -193,14 +211,15 @@ class RelayServer:
 
             if action != Actions.no:
                 self.action_queue.put((player, action))
+                self.action_console_queue.put((player, action))
 
         conn.close()
         with self.connected.get_lock():
             self.connected[COMPONENT_IDS[component]] = False
-            print(f"Disconnected from {component}")
+            self.logs_queue.put(f"Disconnected from {component}")
 
     def init_conn(self, conn, addr):
-        print(f"Accepted connection from {addr}")
+        self.logs_queue.put(f"Accepted connection from {addr}")
         msg = self.recv_msg(conn)
         if not msg:
             return "", ""
@@ -211,7 +230,7 @@ class RelayServer:
         with self.connected.get_lock():
             id = COMPONENT_IDS[component]
             if self.connected[id]:
-                print(f"{component} already connected")
+                self.logs_queue.put(f"{component} already connected")
                 conn.close()
                 return "", ""
 
@@ -231,7 +250,7 @@ class RelayServer:
 
         self.socket.bind((self.host, self.port))
         self.socket.listen(6)
-        print(f"Listening on {self.host}:{self.port}...")
+        self.logs_queue.put(f"Listening on {self.host}:{self.port}...")
 
         while True:
             conn, addr = self.socket.accept()
@@ -241,7 +260,7 @@ class RelayServer:
                 conn.close()
                 continue
             component = player + "_" + sensor
-            print(f"Connection to {component} thread initilised")
+            self.logs_queue.put(f"Connection to {component} thread initilised")
 
             if sensor == "gun":
                 p = mp.Process(
@@ -296,5 +315,4 @@ if __name__ == "__main__":
         relay_server_process.start()
         relay_server_process.join()
     except KeyboardInterrupt:
-        print("\nServer Stopped")
         relay_server_process.terminate()
