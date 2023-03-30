@@ -6,13 +6,14 @@ from EvalClient import EvalClient
 from GameEngine import GameEngine
 
 from GameEngine_Stub import GameEngine_Stub
+from HWAccel import HWAccel
 from MQTTClient import MQTTClient
 
 from RelayServer import RelayServer
 
 
 class Ultra96:
-    def __init__(self, relay_host, relay_port, eval_host, eval_port, stub):
+    def __init__(self, relay_host, relay_port, eval_host, eval_port):
         self.relay_host = relay_host
         self.relay_port = relay_port
 
@@ -27,22 +28,14 @@ class Ultra96:
         self.eval_resp_queue = mp.Queue()
         self.vis_queue = mp.Queue()
 
-        if stub:
-            self.engine = GameEngine_Stub(
-                self.opp_in_frames,
-                self.action_queue,
-                self.eval_req_queue,
-                self.vis_queue,
-            )
-        else:
-            self.engine = GameEngine(
-                self.opp_in_frames,
-                self.action_queue,
-                self.update_beetle_queue,
-                self.eval_req_queue,
-                self.eval_resp_queue,
-                self.vis_queue,
-            )
+        self.engine = GameEngine(
+            self.opp_in_frames,
+            self.action_queue,
+            self.update_beetle_queue,
+            self.eval_req_queue,
+            self.eval_resp_queue,
+            self.vis_queue,
+        )
 
         self.eval_client = EvalClient(
             self.eval_host, self.eval_port, self.eval_req_queue, self.eval_resp_queue
@@ -78,7 +71,7 @@ class Ultra96:
             mqtt_process.join()
             relay_server_process.join()
 
-        finally:
+        except KeyboardInterrupt:
             eval_process.terminate()
             engine_process.terminate()
             mqtt_process.terminate()
@@ -88,7 +81,6 @@ class Ultra96:
 if __name__ == "__main__":
     relay_port = 8080
     eval_port = 2105
-    stub = False
 
     if len(sys.argv) == 1:
         print(
@@ -97,11 +89,6 @@ if __name__ == "__main__":
     elif len(sys.argv) == 3:
         relay_port = int(sys.argv[1])
         eval_port = int(sys.argv[2])
-    elif len(sys.argv) == 4:
-        relay_port = int(sys.argv[1])
-        eval_port = int(sys.argv[2])
-        if sys.argv[3] == "stub":
-            stub = True
     else:
         print("Invalid number of arguments")
         print(
@@ -111,5 +98,5 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    ultra96 = Ultra96("127.0.0.1", relay_port, "137.132.92.184", 9999, stub)
+    ultra96 = Ultra96("127.0.0.1", relay_port, "127.0.0.1", eval_port)
     ultra96.start_game()

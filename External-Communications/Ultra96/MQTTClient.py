@@ -14,16 +14,17 @@ class MQTTClient:
 
         def on_message(client, userdata, msg):
             msg_data = str(msg.payload.decode("utf-8"))
-            print(msg.topic + "  " + msg_data)
+            # print(msg.topic + "  " + msg_data)
             msg_json = json.loads(msg_data)
 
             index = 0 if msg_json["opp"] == "p1" else 1
 
             with self.opp_in_frames.get_lock():
-                self.opp_in_frames[index] = int(msg_json["inFrame"])
-                print(
-                    f"OppInFrame updated - p1: {bool(self.opp_in_frames[0])} p2: {bool(self.opp_in_frames[1])}"
-                )
+                if self.opp_in_frames[index] != int(msg_json["inFrame"]):
+                    self.opp_in_frames[index] = int(msg_json["inFrame"])
+                    print(
+                        f"OppInFrame updated - p1: {bool(self.opp_in_frames[0])} p2: {bool(self.opp_in_frames[1])}\r"
+                    )
 
         self.vis_queue = vis_queue
         self.opp_in_frames = opp_in_frames

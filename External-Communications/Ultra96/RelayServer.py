@@ -96,7 +96,7 @@ class RelayServer:
             success = False
         return success
 
-    def update_beetles(self, update_beetle_queue, edit_conn_queue):
+    def update_beetles(self):
         conns = {
             "p1_gun": None,
             "p1_vest": None,
@@ -105,61 +105,85 @@ class RelayServer:
         }
 
         while True:
-            if not edit_conn_queue.empty():
-                component, conn = edit_conn_queue.get()
+            if not self.edit_conn_queue.empty():
+                component, conn = self.edit_conn_queue.get()
                 conns[component] = conn
 
-                print(conns)
+            if not self.update_beetle_queue.empty():
+                component, data = self.update_beetle_queue.get()
+                print(f"Get from update beetle queue [{data}] {component}")
+                time.sleep(0.2)
+                with self.connected.get_lock():
+                    if self.connected[COMPONENT_IDS[component]]:
+                        print(f"Sending data [{data}] to {component}")
+                        self.send_plaintext(str(data), conns[component])
+                    else:
+                        print(f"Could not send data [{data}] to {component}")
 
-            if not update_beetle_queue.empty():
-                component, data = update_beetle_queue.get()
-                if conns[component]:
-                    print(f"Sending data [{data}] to {component}")
-                    self.send_plaintext(str(data), conns[component])
-                else:
-                    print(f"Could not send data [{data}] to {component}")
+    def update_conn_status(self, msg, component):
+        if msg == "start":
+            with self.connected.get_lock():
+                self.connected[COMPONENT_IDS[component]] = True
+                player, sensor = component.split("_")
+                if sensor == "gun" or sensor == "vest":
+                    print("put connn in action queue")
+                    self.action_queue.put((player, "conn_" + sensor))
 
-    def handle_gun_conn(self, conn, action_queue, edit_conn_queue, player, component):
+                print(f"Connected to {component}")
+            return True
+
+        if msg == "end":
+            with self.connected.get_lock():
+                self.connected[COMPONENT_IDS[component]] = False
+                print(f"Disconnected from {component}")
+            return True
+
+        return False
+
+    def handle_gun_conn(self, conn, player, component):
         while True:
             msg = self.recv_msg(conn)
             if not msg:
                 break
-            # if msg != "shoot":
-            #     print("wrong action (gun)")
-            #     break
+            if self.update_conn_status(msg, component):
+                continue
+            if msg != "shoot":
+                print("wrong action (gun)")
+                continue
 
-            action_queue.put((player, "shoot"))
+            self.action_queue.put((player, "shoot"))
 
         conn.close()
-        edit_conn_queue.put((component, None))
         with self.connected.get_lock():
             self.connected[COMPONENT_IDS[component]] = False
-            print(f"Connection to {component} ended")
+            print(f"Disconnected from {component}")
 
-    def handle_vest_conn(self, conn, action_queue, edit_conn_queue, player, component):
+    def handle_vest_conn(self, conn, player, component):
         while True:
             msg = self.recv_msg(conn)
             if not msg:
                 break
-            # if msg != "hit":
-            #     print("Wrong action (hit)")
-            #     break
+            if self.update_conn_status(msg, component):
+                continue
 
-            action_queue.put((player, "hit"))
+            if msg != "hit":
+                print("wrong action (vest)")
+                continue
+
+            self.action_queue.put((player, "hit"))
 
         conn.close()
-        edit_conn_queue.put((component, None))
         with self.connected.get_lock():
             self.connected[COMPONENT_IDS[component]] = False
-            print(f"Connection to {component} ended")
+            print(f"Disconnected from {component}")
 
-    def handle_glove_conn(
-        self, conn, action_queue, in_queue, out_queue, player, component
-    ):
+    def handle_glove_conn(self, conn, in_queue, out_queue, player, component):
         while True:
             msg = self.recv_msg(conn)
             if not msg:
                 break
+            if self.update_conn_status(msg, component):
+                continue
 
             data = json.loads(msg)
 
@@ -168,30 +192,21 @@ class RelayServer:
             action = out_queue.get()
 
             if action != Actions.no:
-                print(action)
-                action_queue.put((player, action))
+                self.action_queue.put((player, action))
 
         conn.close()
         with self.connected.get_lock():
             self.connected[COMPONENT_IDS[component]] = False
-            print(f"Connection to {component} ended")
+            print(f"Disconnected from {component}")
 
-    def get_player_sensor(self, conn, addr):
+    def init_conn(self, conn, addr):
         print(f"Accepted connection from {addr}")
         msg = self.recv_msg(conn)
         if not msg:
             return "", ""
 
-        data = json.loads(msg)
-
-        if "player" not in data or "sensor" not in data:
-            print("Wrong connection type")
-            conn.close()
-            return "", ""
-
-        sensor = data["sensor"]
-        player = data["player"]
-        component = player + "_" + sensor
+        player, sensor = msg.split("_")
+        component = msg
 
         with self.connected.get_lock():
             id = COMPONENT_IDS[component]
@@ -205,18 +220,12 @@ class RelayServer:
 
         if sensor == "gun" or sensor == "vest":
             self.edit_conn_queue.put((component, conn))
-            time.sleep(0.1)
-            self.action_queue.put((player, "conn_" + sensor))
 
         return player, sensor
 
     def run(self):
         update_process = mp.Process(
             target=self.update_beetles,
-            args=(
-                self.update_beetle_queue,
-                self.edit_conn_queue,
-            ),
         )
         update_process.start()
 
@@ -227,20 +236,18 @@ class RelayServer:
         while True:
             conn, addr = self.socket.accept()
 
-            player, sensor = self.get_player_sensor(conn, addr)
+            player, sensor = self.init_conn(conn, addr)
             if player == "":
                 conn.close()
                 continue
             component = player + "_" + sensor
-            print(f"Connected to {component}")
+            print(f"Connection to {component} thread initilised")
 
             if sensor == "gun":
                 p = mp.Process(
                     target=self.handle_gun_conn,
                     args=(
                         conn,
-                        self.action_queue,
-                        self.edit_conn_queue,
                         player,
                         component,
                     ),
@@ -251,20 +258,18 @@ class RelayServer:
                     target=self.handle_vest_conn,
                     args=(
                         conn,
-                        self.action_queue,
-                        self.edit_conn_queue,
                         player,
                         component,
                     ),
                 )
                 p.start()
+
             elif sensor == "glove":
                 player_ai = getattr(self.ai, player)
                 p = mp.Process(
                     target=self.handle_glove_conn,
                     args=(
                         conn,
-                        self.action_queue,
                         self.glove_in_queue[player],
                         self.glove_out_queue[player],
                         player,
