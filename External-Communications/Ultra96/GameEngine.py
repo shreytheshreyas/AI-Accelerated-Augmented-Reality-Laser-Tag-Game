@@ -113,7 +113,7 @@ class GameEngine:
             or self.game_state.p2.action == Actions.logout
         )
 
-    def run(self):
+    def _run(self):
         game_state = self.game_state.get_dict()
         self.eval_req_console_queue.put(game_state)
         self.eval_resp_console_queue.put(game_state)
@@ -205,3 +205,10 @@ class GameEngine:
                     game_start = False
 
                 self.reset_turn()
+
+    def run(self):
+        try:
+            self.logs_queue.put("Game Engine Started")
+            self._run()
+        except KeyboardInterrupt:
+            self.logs_queue.put("Game Engine Ended")

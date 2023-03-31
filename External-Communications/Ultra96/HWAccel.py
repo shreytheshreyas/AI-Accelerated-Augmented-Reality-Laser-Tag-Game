@@ -49,11 +49,17 @@ class PlayerHWAccel:
         self.start_of_move_flag = 0
         self.action_arr = np.empty((0, NUMBER_OF_SENSOR_FEATURES))
 
-    def run(self):
+    def _run(self):
         while True:
             data = self.in_queue.get()
             prediction = self.get_action(data)
             self.out_queue.put(prediction)
+
+    def run(self):
+        try:
+            self._run()
+        except KeyboardInterrupt:
+            self.logs_queue.put("AI Ended")
 
     def replace_nan(self, arr):
         for idx, val in enumerate(arr[START_MOVE_WINDOW_SIZE - 1]):

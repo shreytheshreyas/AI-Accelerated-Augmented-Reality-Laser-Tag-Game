@@ -1,6 +1,7 @@
 import multiprocessing as mp
 import os
 import sys
+import time
 
 from Console import ConsoleInterface
 
@@ -95,14 +96,15 @@ class Ultra96:
             self.connect_to_eval()
             eval_process.start()
 
+            console_process.join()
             eval_process.join()
             engine_process.join()
             mqtt_process.join()
             relay_server_process.join()
-            console_process.join()
 
         except KeyboardInterrupt:
-            # eval_process.terminate()
+            if eval_process:
+                eval_process.terminate()
             engine_process.terminate()
             mqtt_process.terminate()
             relay_server_process.terminate()

@@ -42,6 +42,8 @@ class RelayServer:
         self.update_beetle_queue = update_beetle_queue
         self.logs_queue = logs_queue
 
+        self.processes = {}
+
         self.glove_in_queue = {
             "p1": mp.Queue(),
             "p2": mp.Queue(),
@@ -139,6 +141,9 @@ class RelayServer:
     def update_conn_status(self, msg, component):
         if msg == "start":
             with self.connected.get_lock():
+                if self.connected[COMPONENT_IDS[component]]:
+                    return True
+
                 self.connected[COMPONENT_IDS[component]] = True
                 player, sensor = component.split("_")
                 if sensor == "gun" or sensor == "vest":
@@ -150,9 +155,15 @@ class RelayServer:
 
         if msg == "end":
             with self.connected.get_lock():
+                if not self.connected[COMPONENT_IDS[component]]:
+                    return True
                 self.connected[COMPONENT_IDS[component]] = False
                 self.logs_queue.put(f"Disconnected from {component}")
             return True
+
+        with self.connected.get_lock():
+            if not self.connected[COMPONENT_IDS[component]]:
+                return True
 
         return False
 
@@ -228,13 +239,11 @@ class RelayServer:
         component = msg
 
         with self.connected.get_lock():
-            id = COMPONENT_IDS[component]
-            if self.connected[id]:
+            if self.connected[COMPONENT_IDS[component]]:
                 self.logs_queue.put(f"{component} already connected")
                 conn.close()
                 return "", ""
 
-            self.connected[id] = True
             self.send_plaintext(f"Server connection for {component} accepted", conn)
 
         if sensor == "gun" or sensor == "vest":
@@ -242,11 +251,11 @@ class RelayServer:
 
         return player, sensor
 
-    def run(self):
-        update_process = mp.Process(
+    def _run(self):
+        self.processes["update_beetles"] = mp.Process(
             target=self.update_beetles,
         )
-        update_process.start()
+        self.processes["update_beetles"].start()
 
         self.socket.bind((self.host, self.port))
         self.socket.listen(6)
@@ -263,7 +272,8 @@ class RelayServer:
             self.logs_queue.put(f"Connection to {component} thread initilised")
 
             if sensor == "gun":
-                p = mp.Process(
+                pid = player + "_gun"
+                self.processes[pid] = mp.Process(
                     target=self.handle_gun_conn,
                     args=(
                         conn,
@@ -271,9 +281,11 @@ class RelayServer:
                         component,
                     ),
                 )
-                p.start()
+                self.processes[pid].start()
+
             elif sensor == "vest":
-                p = mp.Process(
+                pid = player + "_vest"
+                self.processes[pid] = mp.Process(
                     target=self.handle_vest_conn,
                     args=(
                         conn,
@@ -281,25 +293,36 @@ class RelayServer:
                         component,
                     ),
                 )
-                p.start()
+                self.processes[pid].start()
 
             elif sensor == "glove":
+                pid = player + "_glove"
+                ai_pid = player + "_ai"
                 player_ai = getattr(self.ai, player)
-                p = mp.Process(
+                self.processes[pid] = mp.Process(
                     target=self.handle_glove_conn,
                     args=(
                         conn,
-                        self.glove_in_queue[player],
-                        self.glove_out_queue[player],
                         player,
                         component,
                     ),
                 )
-                p_ai = mp.Process(
+                self.processes[ai_pid] = mp.Process(
                     target=player_ai.run,
                 )
-                p.start()
-                p_ai.start()
+                self.processes[pid].start()
+                self.processes[ai_pid].start()
+
+    def run(self):
+        try:
+            self.logs_queue.put("Relay Server Started")
+            self._run()
+        except KeyboardInterrupt:
+            for k, v in self.processes.items():
+                self.logs_queue.put(f"Process {k} ended")
+                v.terminate()
+
+            self.logs_queue.put("Relay Server Ended")
 
 
 if __name__ == "__main__":

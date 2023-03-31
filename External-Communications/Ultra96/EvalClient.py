@@ -90,7 +90,7 @@ class EvalClient:
 
         return msg
 
-    def run(self):
+    def _run(self):
         while True:
             eval_data = self.req_queue.get()
             eval_json = json.dumps(eval_data)
@@ -103,7 +103,13 @@ class EvalClient:
             recv_data = json.loads(recv_json)
             self.resp_queue.put(recv_data)
 
-        self.socket.close()
+    def run(self):
+        try:
+            self.logs_queue.put("Eval Client Started")
+            self._run()
+        except KeyboardInterrupt:
+            self.socket.close()
+            self.logs_queue.put("Eval Client Ended")
 
 
 if __name__ == "__main__":

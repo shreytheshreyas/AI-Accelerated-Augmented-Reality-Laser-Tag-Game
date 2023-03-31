@@ -42,7 +42,7 @@ class MQTTClient:
     def publish(self, data):
         self.client.publish("LaserTag/GameState", data, qos=1)
 
-    def run(self):
+    def _run(self):
         self.client.loop_start()
         while True:
             vis_data = self.vis_queue.get()
@@ -51,6 +51,13 @@ class MQTTClient:
 
     def stop(self):
         self.client.loop_stop()
+
+    def run(self):
+        try:
+            self.logs_queue.put("MQTT Client Started")
+            self._run()
+        except KeyboardInterrupt:
+            self.logs_queue.put("MQTT Client Ended")
 
 
 if __name__ == "__main__":
