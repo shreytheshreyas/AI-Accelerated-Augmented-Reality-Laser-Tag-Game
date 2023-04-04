@@ -221,7 +221,7 @@ class PlayerHWAccel:
         self.dma.recvchannel.wait()
 
         prediction = Actions.glove[np.argmax(self.out_buffer)]
-        self.logs_queue.put("prediction:", prediction)
+        self.logs_queue.put(f"prediction: {prediction}")
         return prediction
 
     def rmsValue(self, arr, col):

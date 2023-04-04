@@ -117,33 +117,37 @@ class RelayServer:
             "p2_gun": None,
             "p2_vest": None,
         }
+        try:
+            while True:
+                if not self.edit_conn_queue.empty():
+                    component, conn = self.edit_conn_queue.get()
+                    conns[component] = conn
 
-        while True:
-            if not self.edit_conn_queue.empty():
-                component, conn = self.edit_conn_queue.get()
-                conns[component] = conn
-
-            if not self.update_beetle_queue.empty():
-                component, data = self.update_beetle_queue.get()
-                self.logs_queue.put(
-                    f"Get from update beetle queue [{data}] {component}"
-                )
-                time.sleep(0.2)
-                with self.connected.get_lock():
-                    if self.connected[COMPONENT_IDS[component]]:
-                        self.logs_queue.put(f"Sending data [{data}] to {component}")
-                        self.send_plaintext(str(data), conns[component])
-                    else:
-                        self.logs_queue.put(
-                            f"Could not send data [{data}] to {component}"
-                        )
+                if not self.update_beetle_queue.empty():
+                    component, data = self.update_beetle_queue.get()
+                    self.logs_queue.put(
+                        f"Get from update beetle queue [{data}] {component}"
+                    )
+                    time.sleep(0.2)
+                    with self.connected.get_lock():
+                        if self.connected[COMPONENT_IDS[component]]:
+                            self.logs_queue.put(f"Sending data [{data}] to {component}")
+                            self.send_plaintext(str(data), conns[component])
+                        else:
+                            self.logs_queue.put(
+                                f"Could not send data [{data}] to {component}"
+                            )
+        except KeyboardInterrupt:
+            self.logs_queue.put("Update Beetles Ended")
 
     def update_conn_status(self, msg, component):
         if msg == "start":
+            self.logs_queue.put(f"Start received from {component}")
             with self.connected.get_lock():
                 if self.connected[COMPONENT_IDS[component]]:
                     return True
 
+                self.logs_queue.put(f"Not connected yet")
                 self.connected[COMPONENT_IDS[component]] = True
                 player, sensor = component.split("_")
                 if sensor == "gun" or sensor == "vest":
@@ -163,71 +167,80 @@ class RelayServer:
 
         with self.connected.get_lock():
             if not self.connected[COMPONENT_IDS[component]]:
+                self.logs_queue(f"Not Connected to {component}")
                 return True
 
         return False
 
     def handle_gun_conn(self, conn, player, component):
-        while True:
-            msg = self.recv_msg(conn)
-            if not msg:
-                break
-            if self.update_conn_status(msg, component):
-                continue
-            if msg != "shoot":
-                self.logs_queue.put("wrong action (gun)")
-                continue
+        try:
+            while True:
+                msg = self.recv_msg(conn)
+                if not msg:
+                    break
+                if self.update_conn_status(msg, component):
+                    continue
+                if msg != "shoot":
+                    self.logs_queue.put("wrong action (gun)")
+                    continue
+                self.action_queue.put((player, "shoot"))
+                self.action_console_queue.put((player, "shoot"))
 
-            self.action_queue.put((player, "shoot"))
-            self.action_console_queue.put((player, "shoot"))
-
-        conn.close()
-        with self.connected.get_lock():
-            self.connected[COMPONENT_IDS[component]] = False
-            self.logs_queue.put(f"Disconnected from {component}")
+            conn.close()
+            with self.connected.get_lock():
+                self.connected[COMPONENT_IDS[component]] = False
+                self.logs_queue.put(f"Disconnected from {component}")
+        except KeyboardInterrupt:
+            self.logs_queue.put(f"Component {component} Ended")
 
     def handle_vest_conn(self, conn, player, component):
-        while True:
-            msg = self.recv_msg(conn)
-            if not msg:
-                break
-            if self.update_conn_status(msg, component):
-                continue
+        try:
+            while True:
+                msg = self.recv_msg(conn)
+                if not msg:
+                    break
+                if self.update_conn_status(msg, component):
+                    continue
 
-            if msg != "hit":
-                self.logs_queue.put("wrong action (vest)")
-                continue
+                if msg != "hit":
+                    self.logs_queue.put("wrong action (vest)")
+                    continue
 
-            self.action_queue.put((player, "hit"))
-            self.action_console_queue.put((player, "hit"))
+                self.action_queue.put((player, "hit"))
+                self.action_console_queue.put((player, "hit"))
 
-        conn.close()
-        with self.connected.get_lock():
-            self.connected[COMPONENT_IDS[component]] = False
-            self.logs_queue.put(f"Disconnected from {component}")
+            conn.close()
+            with self.connected.get_lock():
+                self.connected[COMPONENT_IDS[component]] = False
+                self.logs_queue.put(f"Disconnected from {component}")
+        except KeyboardInterrupt:
+            self.logs_queue.put(f"Component {component} Ended")
 
     def handle_glove_conn(self, conn, in_queue, out_queue, player, component):
-        while True:
-            msg = self.recv_msg(conn)
-            if not msg:
-                break
-            if self.update_conn_status(msg, component):
-                continue
+        try:
+            while True:
+                msg = self.recv_msg(conn)
+                if not msg:
+                    break
+                if self.update_conn_status(msg, component):
+                    continue
 
-            data = json.loads(msg)
+                data = json.loads(msg)
+                in_queue.put(list(data.values())[1:])
+                action = out_queue.get()
 
-            in_queue.put(list(data.values())[1:])
+                # self.logs_queue.put(f"AI Output = {action}")
 
-            action = out_queue.get()
+                if action != Actions.no:
+                    self.action_queue.put((player, action))
+                    self.action_console_queue.put((player, action))
 
-            if action != Actions.no:
-                self.action_queue.put((player, action))
-                self.action_console_queue.put((player, action))
-
-        conn.close()
-        with self.connected.get_lock():
-            self.connected[COMPONENT_IDS[component]] = False
-            self.logs_queue.put(f"Disconnected from {component}")
+            conn.close()
+            with self.connected.get_lock():
+                self.connected[COMPONENT_IDS[component]] = False
+                self.logs_queue.put(f"Disconnected from {component}")
+        except KeyboardInterrupt:
+            self.logs_queue.put(f"Component {component} Ended")
 
     def init_conn(self, conn, addr):
         self.logs_queue.put(f"Accepted connection from {addr}")
@@ -303,6 +316,8 @@ class RelayServer:
                     target=self.handle_glove_conn,
                     args=(
                         conn,
+                        self.glove_in_queue[player],
+                        self.glove_out_queue[player],
                         player,
                         component,
                     ),

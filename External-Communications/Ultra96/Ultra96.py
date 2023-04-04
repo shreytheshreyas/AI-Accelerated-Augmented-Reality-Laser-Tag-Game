@@ -103,7 +103,7 @@ class Ultra96:
             relay_server_process.join()
 
         except KeyboardInterrupt:
-            if eval_process:
+            if eval_process.is_alive():
                 eval_process.terminate()
             engine_process.terminate()
             mqtt_process.terminate()

@@ -74,12 +74,13 @@ class GameEngine:
             },
         }
 
-    def check_turn(self, player, opp):
+    def check_turn(self, player):
         if (
-            (
-                self.signals[player]["action"] == Actions.shoot
-                and self.signals[player]["opp_hit"]
-            )
+            # (
+            #     self.signals[player]["action"] == Actions.shoot
+            #     and self.signals[player]["opp_hit"]
+            # )
+            self.signals[player]["action"] == Actions.shoot
             or self.signals[player]["action"] == Actions.grenade
             or self.signals[player]["action"] == Actions.reload
             or self.signals[player]["action"] == Actions.shield
@@ -99,6 +100,14 @@ class GameEngine:
 
         return self.complete["p1"] or self.complete["p2"]
 
+    def after_delay(self):
+        self.turn_time_left = self.turn_end_time - time.time()
+        # self.logs_queue.put(f"Checking is turn over, time left = {self.turn_time_left}")
+        # if self.turn_time_left <= 0:
+        # self.logs_queue.put("turn is over")
+
+        return self.turn_time_left <= 0
+
     def is_turn_over(self):
         self.turn_time_left = self.turn_end_time - time.time()
         # self.logs_queue.put(f"Checking is turn over, time left = {self.turn_time_left}")
@@ -117,7 +126,7 @@ class GameEngine:
         game_state = self.game_state.get_dict()
         self.eval_req_console_queue.put(game_state)
         self.eval_resp_console_queue.put(game_state)
-        self.reset_turn()
+        # self.reset_turn()
         game_start = True
 
         while game_start:
@@ -125,7 +134,8 @@ class GameEngine:
                 # self.logs_queue.put("Getting from action queue")
                 player, action = self.action_queue.get()
                 opp = self.get_opp(player)
-                self.logs_queue.put(player, action)
+
+                self.logs_queue.put(f"Got from action queue - {player}, {action}")
 
                 # If new connection, action will be 'conn_<sensor>'
                 conn_list = action.split("_", 1)
@@ -135,25 +145,28 @@ class GameEngine:
                     data = getattr(
                         getattr(self.game_state, player), SENSOR_MAPPING[sensor]
                     )
-                    self.logs_queue.put(SENSOR_MAPPING[sensor], "=", data)
+                    self.logs_queue.put(f"{SENSOR_MAPPING[sensor]} = {data}")
                     self.update_beetle_queue.put((player + "_" + sensor, str(data)))
                     continue
 
                 if action in Actions.all:
                     if self.signals[player]["action"] == Actions.no:
                         self.signals[player]["action"] = action
-                        if self.signals[opp]["action"] == Actions.no:
-                            self.reset_timer()
+                        # if action == "shoot":
+                        #     self.reset_timer()
+                        # if self.signals[opp]["action"] == Actions.no:
+                        #     self.reset_timer()
                 elif action == Actions.hit:
                     if not self.signals[opp]["opp_hit"]:
                         self.signals[opp]["opp_hit"] = True
-                        if self.signals[opp]["action"] == Actions.no:
-                            self.reset_timer()
+                        # if self.signals[opp]["action"] == Actions.no:
+                        #     self.reset_timer()
 
-                self.check_turn("p1", "p2")
-                self.check_turn("p2", "p1")
+                self.check_turn("p1")
+                self.check_turn("p2")
 
-            if self.is_complete() or self.is_turn_over():
+            # if self.is_complete() and self.after_delay():
+            if self.is_complete():
                 action_p1 = self.signals["p1"]["action"]
                 action_p2 = self.signals["p2"]["action"]
 
