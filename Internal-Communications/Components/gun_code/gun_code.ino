@@ -40,6 +40,7 @@ byte sendDataPacket = false;
 unsigned long reshoot_timeout = millis();
 
 
+
 //Class definition for protocol
 class Protocol {
 private:
@@ -81,7 +82,9 @@ Protocol::Protocol() {
 }
 
 int Protocol::calculate_checksum(void) {
+
     uint8_t checksum = 0;
+
 
     for(int idx = 0; idx < 5; idx++)
         checksum ^= this->packet[idx];
@@ -111,6 +114,7 @@ void Protocol::start_communication() {
     byte receivedData = Serial.read();
 
     switch(receivedData) {
+
     case SYNC:
         hasHandshakeStarted = true;
         hasHandshakeEnded = false;
@@ -160,6 +164,7 @@ void sensorDelay(long interval) {
     }
 }
 
+
 void Protocol::send_data() {
     this->currentTime = millis();
     for(int i =0; i < DATA_PACKET_SPAM_COUNT; i++) {
@@ -171,6 +176,7 @@ void Protocol::send_data() {
     this->previousTime = this->currentTime;
 }
 
+
 void outOfAmmoTune() {
     tone(buzzerPin,NOTE_D1,100);
     sensorDelay(100); //replace with custom delay
@@ -179,6 +185,7 @@ void outOfAmmoTune() {
 
 
 void setup() {
+
     Serial.begin(DATA_RATE);
     pinMode(buttonPin, INPUT_PULLUP);
     pinMode(buzzerPin, OUTPUT);

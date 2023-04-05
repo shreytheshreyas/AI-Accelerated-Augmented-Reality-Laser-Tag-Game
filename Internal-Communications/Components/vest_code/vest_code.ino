@@ -20,6 +20,7 @@
 
 #define INIT_HEALTH 100
 
+
 //Defining packet types
 #define SYNC 'S'
 #define ACK 'A'
@@ -35,6 +36,7 @@ TM1637Display display = TM1637Display(CLK, DIO);
 
 const uint16_t PLAYER_1_ADDRESS = 0x0102; //Address for Player 1's Shot
 const uint16_t PLAYER_2_ADDRESS = 0x0105; //Address for Player 2's Shot
+
 const uint8_t command = 'X'; //1 for player 1
 uint8_t shotID;
 uint8_t health = INIT_HEALTH;
@@ -52,7 +54,6 @@ const uint8_t DEAD[] = {
 };
 
 int melody[] = {
-
     NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4
 };
 
@@ -122,6 +123,7 @@ void Protocol::get_sensor_data() {
 }
 
 void Protocol::initialize_packet_data() {
+
     this->packet[0] = this->sequenceNumber;
     this->packet[1] = VEST_DATA;
     this->packet[2] = health;
@@ -194,7 +196,26 @@ void deadTune() {
     }
 }
 
+void sensorDelay(long interval) {
+ unsigned long currentMillis = millis();
+
+ while(currentMillis - sensorDelayStartTime < interval)
+    currentMillis = millis();
+ 
+}
+void deadTune(){
+  for (int thisNote = 0; thisNote < 8; thisNote++) {
+    int noteDuration = 1000 / noteDurations[thisNote];
+    tone(BUZZER_PIN, melody[thisNote], noteDuration);
+    int pauseBetweenNotes = noteDuration * 1.30;
+    sensorDelayStartTime = millis();
+    sensorDelay(pauseBetweenNotes);
+    noTone(8);
+  }
+}
+
 void setup() {
+
     Serial.begin(DATA_RATE);
     pinMode(BUZZER_PIN,OUTPUT);
     display.setBrightness(5);

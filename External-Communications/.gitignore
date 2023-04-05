@@ -1,0 +1,3 @@
+*/__pycache__
+*/.env
+./eval_server/evaluation_logs/
