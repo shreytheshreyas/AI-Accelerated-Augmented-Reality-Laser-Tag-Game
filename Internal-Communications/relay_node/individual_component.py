@@ -1,20 +1,29 @@
-from bluepy.btle import Peripheral, DefaultDelegate, BTLEDisconnectError, ADDR_TYPE_RANDOM
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
-from queue import Queue
-from client import LaptopClient
-from os import system
-import threading 
+import json
 import logging
-import time 
 import struct
-import csv
+import sys
+import threading
+import time
+from collections import defaultdict
+from datetime import datetime
+from os import system
+from queue import Queue
 
-#Respond Message Buffer size
-NUM_OF_BEETLES =  9 #Need to update to 6 to accomodate two players
+from bluepy.btle import BTLEDisconnectError, DefaultDelegate, Peripheral
+from client import LaptopClient
+
+PORT = 8081
+LOCAL_TEST = False
+MODE = 3
+
+CHARACTERISTIC = "0000dfb1-0000-1000-8000-00805f9b34fb"
+
+# Respond Message Buffer size
+NUM_OF_BEETLES = 9  # Need to update to 6 to accomodate two players
 DATA_BUFFER_SIZE = 20
+DEBOUNCE_TIME = 5
 
-#BLUNO ID's for the respective players 
+# BLUNO ID's for the respective players
 PLAYER_1_GUN = 0
 PLAYER_1_VEST = 1
 PLAYER_1_IMU = 2
@@ -25,39 +34,43 @@ TEST_GUN = 6
 TEST_VEST = 7
 TEST_IMU = 8
 
-#Constants for packet types 
-SYNC = 'S' #Packet type for handshake. 
-RST = 'R' #For reseting beetle state
-ACK = 'A' #Packet type for SYN-acknowledgment. 
-DATA_ACK = 'D' #Packet type for data-acknowledgment
-DATA_NACK = 'N' #Packet type for data-nagative-acknowledgment
-IMU = 'I' #The ASCII code associated with I is 73
-GUN = 'G' #The ASCII code associated with G is 71
-VEST = 'V' #The ASCII code associated with V is 86
+# Constants for packet types
+SYNC = "S"  # Packet type for handshake.
+RST = "R"  # For reseting beetle state
+ACK = "A"  # Packet type for SYN-acknowledgment.
+DATA_ACK = "D"  # Packet type for data-acknowledgment
+DATA_NACK = "N"  # Packet type for data-nagative-acknowledgment
+IMU = "I"  # The ASCII code associated with I is 73
+GUN = "G"  # The ASCII code associated with G is 71
+VEST = "V"  # The ASCII code associated with V is 86
 
 PLAYER_JSON_DATA = [
-        '{"player": "p1", "sensor": "gun"}',
-        '{"player": "p1", "sensor": "vest"}',
-        '{"player": "p1", "sensor": "glove"}',
-        '{"player": "p2", "sensor": "gun"}',
-        '{"player": "p2", "sensor": "vest"}',
-        '{"player": "p2", "sensor": "glove"}',
-        '{"player": "p1", "sensor": "gun"}',
-        '{"player": "p1", "sensor": "vest"}',
-        '{"player": "p1", "sensor": "glove"}'
+    "p1_gun",
+    "p1_vest",
+    "p1_glove",
+    "p2_gun",
+    "p2_vest",
+    "p2_glove",
+    "p1_gun",
+    "p2_vest",
+    "p2_glove",
 ]
 
 MAC_ADDRESSES = {
-        0: 'D0:39:72:BF:CA:D4',
-        1: 'D0:39:72:BF:C3:8F',
-        2: 'D0:39:72:BF:C8:D8',
-        3: 'a',
-        4: 'a',
-        5: 'D0:39:72:BF:C3:D6',
-        6: 'D0:39:72:BF:C8:89',
-        7: 'D0:39:72:BF:C8:D7',
-        8: '6C:79:B8:D3:6A:A3'
+    0: "D0:39:72:BF:CD:20",
+    1: "D0:39:72:BF:CD:0A",
+    2: "D0:39:72:BF:C8:D8",
+    3: "6C:79:B8:D3:80:5B",
+    4: "D0:39:72:BF:C3:8F",
+    5: "D0:39:72:BF:CA:D4",
+    6: "D0:39:72:BF:C8:89",
+    7: "D0:39:72:BF:C8:D7",
+    8: "6C:79:B8:D3:6A:A3",
 }
+
+### GUN DATA WAIT TIME
+GUN_DATA_WAIT_TIME = 0.1
+
 
 class StatisticsManager:
     beetlesKbps = [0] * NUM_OF_BEETLES
@@ -70,11 +83,11 @@ class StatisticsManager:
     totalNumOfBytesReceivedLock = threading.Lock()
     dataReceivedLock = threading.Lock()
     fragmentedPacketCounterLock = threading.Lock()
-    
+
     @classmethod
     def set_start_time(cls, beetleId):
         cls.beetlesStartTime[beetleId] = datetime.now()
-    
+
     @classmethod
     def clear_data_rate(cls, beetleId):
         cls.totalNumOfBytesReceived[beetleId] = 0
@@ -83,97 +96,149 @@ class StatisticsManager:
     @classmethod
     def calculate_data_rate(cls, beetleId):
         try:
-            #cls.totalNumOfBytesReceivedLock.acquire()
+            # cls.totalNumOfBytesReceivedLock.acquire()
             cls.totalNumOfBytesReceived[beetleId] += 20
-            #cls.totalNumOfBytesReceivedLock.release()
-    
-            resultantDataRate = (cls.totalNumOfBytesReceived[beetleId] * 8) / (1000 * (datetime.now() - cls.beetlesStartTime[beetleId]).total_seconds())
-            #cls.dataRateLock.acquire()
+            # cls.totalNumOfBytesReceivedLock.release()
+
+            resultantDataRate = (cls.totalNumOfBytesReceived[beetleId] * 8) / (
+                1000 * (datetime.now() - cls.beetlesStartTime[beetleId]).total_seconds()
+            )
+            # cls.dataRateLock.acquire()
             cls.beetlesKbps[beetleId] = resultantDataRate
-            #cls.dataRateLock.release()
+            # cls.dataRateLock.release()
         except Exception as e:
             pass
+
     @classmethod
     def increment_num_fragmented_packets(cls, beetleId):
-        #cls.fragementedPacketCounterLock.acquire()
+        # cls.fragementedPacketCounterLock.acquire()
         cls.fragmentedPacketCounter[beetleId] += 1
-        #cls.fragmentedPacketCounterLock.release()
-    
+        # cls.fragmentedPacketCounterLock.release()
+
     @classmethod
     def set_beetle_statistics(cls, beetleId, data):
-        #cls.dataReceivedLock.acquire()
+        # cls.dataReceivedLock.acquire()
         cls.dataReceived[beetleId] = data
-        #cls.dataReceived.release()
+        # cls.dataReceived.release()
         cls.calculate_data_rate(beetleId)
-    
+
     @classmethod
     def display_statistics(cls):
-        connectionStatus = {True: 'Connected', False: 'Disconnected'}
-        handshakeStatus = {True: 'Completed', False: 'Not-Completed'}
+        connectionStatus = {True: "Connected", False: "Disconnected"}
+        handshakeStatus = {True: "Completed", False: "Not-Completed"}
 
-        system('clear')
-        print('\r')
-        
+        system("clear")
+        print("\r")
+
         if cls.dataReceived[TEST_GUN] is not None:
-            print(f'GUN-DATA #######################################################################################################################################################################')
-            print(f'Beetle-Id = {TEST_GUN}')
-            print(f'Connection-Status = {connectionStatus[StatusManager.get_connection_status(TEST_GUN)]}')
-            print(f'Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(TEST_GUN)]}')
-            print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_GUN]}')
+            print(
+                f"GUN-DATA #######################################################################################################################################################################"
+            )
+            print(f"Beetle-Id = {TEST_GUN}")
+            print(
+                f"Connection-Status = {connectionStatus[StatusManager.get_connection_status(TEST_GUN)]}"
+            )
+            print(
+                f"Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(TEST_GUN)]}"
+            )
+            print(f"Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_GUN]}")
             print(f'sequenceNumber = {cls.dataReceived[TEST_GUN]["sequenceNumber"]}')
-            print(f'Value received from GUN = {cls.dataReceived[TEST_GUN]["dataValue"]}')
-            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_GUN]}\n')
-        else: 
-            print('################ NO-GUN-DATA-AVAILABLE ######################\n')
-        
-        if cls.dataReceived[TEST_VEST] is not None:
-            print(f'VEST-DATA #######################################################################################################################################################################')
-            print(f'Beetle-Id = {TEST_VEST}')
-            print(f'Connection-Status = {connectionStatus[StatusManager.get_connection_status(TEST_VEST)]}')
-            print(f'Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(TEST_VEST)]}')
-            print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_VEST]}')
-            print(f'sequenceNumber = {cls.dataReceived[TEST_VEST]["sequenceNumber"]}')
-            print(f'Value received from GUN = {cls.dataReceived[TEST_VEST]["dataValue"]}')
-            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_VEST]}\n')
+            print(
+                f'Value received from GUN = {cls.dataReceived[TEST_GUN]["dataValue"]}'
+            )
+            print(
+                f"Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_GUN]}\n"
+            )
         else:
-            print('################ NO-VEST-DATA-AVAILABLE ######################\n')
-    
-        if cls.dataReceived[PLAYER_2_IMU] is not None:
-            print(f'IMU-DATA #########################################################################################################################################################################')
-            print(f'Beetle-Id = {PLAYER_2_IMU}') 
-            print(f'Connection-Status = {connectionStatus[StatusManager.get_connection_status(PLAYER_2_IMU)]}')
-            print(f'Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(PLAYER_2_IMU)]}')
-            print(f'Data Rate of Beetle in Kbps = {cls.beetlesKbps[PLAYER_2_IMU]}')
-            print(f'sequenceNumber = {cls.dataReceived[PLAYER_2_IMU]["sequenceNumber"]}')
-            print(f'Linear-Acceleration-X = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataLinearAccelX"]}')
-            print(f'Linear-Acceleration-Y = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataLinearAccelY"]}')
-            print(f'Linear-Acceleration-Z = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataLinearAccelZ"]}')
-            print(f'Gyro-Acceleration-Y = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataGyroAccelX"]}')
-            print(f'Gyro-Acceleration-Z = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataGyroAccelY"]}')
-            print(f'Gyro-Acceleration-Z = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataGyroAccelZ"]}')
-            print(f'Roll = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataRoll"]}')
-            print(f'Pitch = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataPitch"]}')
-            print(f'Yaw = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataYaw"]}')
-            print(f'Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[PLAYER_2_IMU]}\n')
-        else:
-            print('################ NO-IMU-DATA-AVAILABLE ######################\n')
+            print("################ NO-GUN-DATA-AVAILABLE ######################\n")
 
-'''
+        if cls.dataReceived[TEST_VEST] is not None:
+            print(
+                f"VEST-DATA #######################################################################################################################################################################"
+            )
+            print(f"Beetle-Id = {TEST_VEST}")
+            print(
+                f"Connection-Status = {connectionStatus[StatusManager.get_connection_status(TEST_VEST)]}"
+            )
+            print(
+                f"Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(TEST_VEST)]}"
+            )
+            print(f"Data Rate of Beetle in Kbps = {cls.beetlesKbps[TEST_VEST]}")
+            print(f'sequenceNumber = {cls.dataReceived[TEST_VEST]["sequenceNumber"]}')
+            print(
+                f'Value received from GUN = {cls.dataReceived[TEST_VEST]["dataValue"]}'
+            )
+            print(
+                f"Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[TEST_VEST]}\n"
+            )
+        else:
+            print("################ NO-VEST-DATA-AVAILABLE ######################\n")
+
+        if cls.dataReceived[PLAYER_2_IMU] is not None:
+            print(
+                f"IMU-DATA #########################################################################################################################################################################"
+            )
+            print(f"Beetle-Id = {PLAYER_2_IMU}")
+            print(
+                f"Connection-Status = {connectionStatus[StatusManager.get_connection_status(PLAYER_2_IMU)]}"
+            )
+            print(
+                f"Handshake-Status = {handshakeStatus[StatusManager.get_connection_status(PLAYER_2_IMU)]}"
+            )
+            print(f"Data Rate of Beetle in Kbps = {cls.beetlesKbps[PLAYER_2_IMU]}")
+            print(
+                f'sequenceNumber = {cls.dataReceived[PLAYER_2_IMU]["sequenceNumber"]}'
+            )
+            print(
+                f'Linear-Acceleration-X = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataLinearAccelX"]}'
+            )
+            print(
+                f'Linear-Acceleration-Y = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataLinearAccelY"]}'
+            )
+            print(
+                f'Linear-Acceleration-Z = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataLinearAccelZ"]}'
+            )
+            print(
+                f'Gyro-Acceleration-Y = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataGyroAccelX"]}'
+            )
+            print(
+                f'Gyro-Acceleration-Z = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataGyroAccelY"]}'
+            )
+            print(
+                f'Gyro-Acceleration-Z = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataGyroAccelZ"]}'
+            )
+            print(
+                f'Roll = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataRoll"]}'
+            )
+            print(
+                f'Pitch = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataPitch"]}'
+            )
+            print(f'Yaw = {cls.dataReceived[PLAYER_2_IMU]["dataValue"]["imuDataYaw"]}')
+            print(
+                f"Total Number of Fragmented Packets = {cls.fragmentedPacketCounter[PLAYER_2_IMU]}\n"
+            )
+        else:
+            print("################ NO-IMU-DATA-AVAILABLE ######################\n")
+
+
+"""
 BufferManager DOCUMENTATION
-'''
+"""
+
+
 class BufferManager:
     relayNodeBuffer = Queue(DATA_BUFFER_SIZE)
-    
+
     @classmethod
     def insertDataValue(cls, beetle_id, dataValue):
-        relayNodeBuffer.put(dataValue)    
+        relayNodeBuffer.put(dataValue)
 
-    @classmethod 
+    @classmethod
     def transferDataValue(cls):
         pass
 
 
-'''
+"""
 StatusManager DOCUMENTATION
 This is primarly used to access the following class level variables 
 
@@ -261,262 +326,267 @@ This is primarly used to access the following class level variables
     - Following are the locks associated with thislist object:
         * dataNackStatusLock 
 
-'''
+"""
+
+
 class StatusManager:
-    
-    connectionStatusFlags = [False] * NUM_OF_BEETLES   
+    connectionStatusFlags = [False] * NUM_OF_BEETLES
     resetStatusFlags = [False] * NUM_OF_BEETLES
-    syncStatusFlags = [False] * NUM_OF_BEETLES 
-    ackStatusFlags = [False] * NUM_OF_BEETLES 
-    dataAckStatusFlags = [False] * NUM_OF_BEETLES 
+    syncStatusFlags = [False] * NUM_OF_BEETLES
+    ackStatusFlags = [False] * NUM_OF_BEETLES
+    dataAckStatusFlags = [False] * NUM_OF_BEETLES
     dataNackStatusFlags = [False] * NUM_OF_BEETLES
-    
+
     connectionStatusLock = threading.Lock()
     resetStatusLock = threading.Lock()
     syncStatusLock = threading.Lock()
     ackStatusLock = threading.Lock()
-    dataAckStatusLock = threading.Lock()   
+    dataAckStatusLock = threading.Lock()
     dataNackStatusLock = threading.Lock()
-    
+
     @classmethod
     def set_status(cls, name, lock, flags, beetle_id, value):
         lock.acquire()
-        #print(f'Acquire {name} status {beetle_id}')
+        # print(f'Acquire {name} status {beetle_id}')
         flags[beetle_id] = value
         lock.release()
-        #print(f'Release {name} status {beetle_id}')
+        # print(f'Release {name} status {beetle_id}')
 
-    #METHODS ASSOCIATED WITH CONNECTION BUFFER
+    # METHODS ASSOCIATED WITH CONNECTION BUFFER
     @classmethod
     def set_connection_status(cls, beetle_id):
-        cls.set_status('conn', cls.connectionStatusLock, cls.connectionStatusFlags, beetle_id, True)
+        cls.set_status(
+            "conn", cls.connectionStatusLock, cls.connectionStatusFlags, beetle_id, True
+        )
 
     @classmethod
     def clear_connection_status(cls, beetle_id):
-        cls.set_status('conn', cls.connectionStatusLock, cls.connectionStatusFlags, beetle_id, False)
+        cls.set_status(
+            "conn",
+            cls.connectionStatusLock,
+            cls.connectionStatusFlags,
+            beetle_id,
+            False,
+        )
 
     @classmethod
     def get_connection_status(cls, beetle_id):
         return cls.connectionStatusFlags[beetle_id]
 
-    #METHODS ASSOCIATED WITH RESET BUFFER
+    # METHODS ASSOCIATED WITH RESET BUFFER
     @classmethod
     def set_reset_status(cls, beetle_id):
-        cls.set_status('reset', cls.resetStatusLock, cls.resetStatusFlags, beetle_id, True)
+        cls.set_status(
+            "reset", cls.resetStatusLock, cls.resetStatusFlags, beetle_id, True
+        )
 
     @classmethod
     def clear_reset_status(cls, beetle_id):
-        cls.set_status('reset', cls.resetStatusLock, cls.resetStatusFlags, beetle_id, False)
+        cls.set_status(
+            "reset", cls.resetStatusLock, cls.resetStatusFlags, beetle_id, False
+        )
 
     @classmethod
     def get_reset_status(cls, beetle_id):
         return cls.resetStatusFlags[beetle_id]
 
-
-    #METHODS ASSOCIATED WITH SYNC BUFFER
+    # METHODS ASSOCIATED WITH SYNC BUFFER
     @classmethod
     def set_sync_status(cls, beetle_id):
-        cls.set_status('sync', cls.syncStatusLock, cls.syncStatusFlags, beetle_id, True)
+        cls.set_status("sync", cls.syncStatusLock, cls.syncStatusFlags, beetle_id, True)
 
     @classmethod
     def clear_sync_status(cls, beetle_id):
-        cls.set_status('sync', cls.syncStatusLock, cls.syncStatusFlags, beetle_id, False)
+        cls.set_status(
+            "sync", cls.syncStatusLock, cls.syncStatusFlags, beetle_id, False
+        )
 
     @classmethod
     def get_sync_status(cls, beetle_id):
         return cls.syncStatusFlags[beetle_id]
 
-
-
-    #METHODS ASSOCIATED WITH ACK BUFFER
+    # METHODS ASSOCIATED WITH ACK BUFFER
     @classmethod
     def set_ack_status(cls, beetle_id):
-        cls.set_status('ack', cls.ackStatusLock, cls.ackStatusFlags, beetle_id, True)
+        cls.set_status("ack", cls.ackStatusLock, cls.ackStatusFlags, beetle_id, True)
 
     @classmethod
     def clear_ack_status(cls, beetle_id):
-        cls.set_status('ack', cls.ackStatusLock, cls.ackStatusFlags, beetle_id, False)
+        cls.set_status("ack", cls.ackStatusLock, cls.ackStatusFlags, beetle_id, False)
 
     @classmethod
     def get_ack_status(cls, beetle_id):
         return cls.ackStatusFlags[beetle_id]
 
-
-    #METHODS ASSOCIATED WITH DATA-ACK BUFFER
+    # METHODS ASSOCIATED WITH DATA-ACK BUFFER
     @classmethod
     def set_data_ack_status(cls, beetle_id):
-        cls.set_status('data ack', cls.dataAckStatusLock, cls.dataAckStatusFlags, beetle_id, True)
+        cls.set_status(
+            "data ack", cls.dataAckStatusLock, cls.dataAckStatusFlags, beetle_id, True
+        )
 
     @classmethod
     def clear_data_ack_status(cls, beetle_id):
-        cls.set_status('data ack', cls.dataAckStatusLock, cls.dataAckStatusFlags, beetle_id, False)
+        cls.set_status(
+            "data ack", cls.dataAckStatusLock, cls.dataAckStatusFlags, beetle_id, False
+        )
 
     @classmethod
     def get_data_ack_status(cls, beetle_id):
         return cls.dataAckStatusFlags[beetle_id]
 
-
-    #METHODS ASSOCIATED WITH DATA-NACK BUFFER
+    # METHODS ASSOCIATED WITH DATA-NACK BUFFER
     @classmethod
     def set_data_nack_status(cls, beetle_id):
-        cls.set_status('data nack', cls.dataNackStatusLock, cls.dataNackStatusFlags, beetle_id, True)
+        cls.set_status(
+            "data nack",
+            cls.dataNackStatusLock,
+            cls.dataNackStatusFlags,
+            beetle_id,
+            True,
+        )
 
     @classmethod
     def clear_data_nack_status(cls, beetle_id):
-        cls.set_status('data nack', cls.dataNackStatusLock, cls.dataNackStatusFlags, beetle_id, False)
+        cls.set_status(
+            "data nack",
+            cls.dataNackStatusLock,
+            cls.dataNackStatusFlags,
+            beetle_id,
+            False,
+        )
 
     @classmethod
     def get_data_nack_status(cls, beetle_id):
         return cls.dataNackStatusFlags[beetle_id]
 
+
 class BluetoothInterfaceHandler(DefaultDelegate):
-    def __init__(self, beetleId):
+    def __init__(self, beetleId, laptopClient):
         DefaultDelegate.__init__(self)
         self.beetleId = beetleId
-        self.receivingBuffer = b'' 
-        self.imuDataFeatureVector = {}
+        self.receivingBuffer = b""
+        self.imuDataFeatureVectors = defaultdict(dict)
         self.imuDataFlagCounter = 0
+        self.bulletDataReceivedTime = time.time()
+        self.healthDataReceivedTime = time.time()
         self.imuDataFlags = {
-                'linear-accel-vector': False,
-                'gyro-accel-vector': False,
-                'rotational-force-vector':False
-                }
-        
+            "linear-accel-vector": False,
+            "gyro-accel-vector": False,
+            "rotational-force-vector": False,
+        }
+        self.laptopClient = laptopClient
+
     def verify_checksum(self, packetData):
-        checksum = 0        
+        checksum = 0
         for idx in range(len(packetData) - 1):
-            checksum = (checksum ^ packetData[idx])
-        return  packetData[19] == checksum
+            checksum = checksum ^ packetData[idx]
+        return packetData[19] == checksum
 
     def handleNotification(self, cHandle, data):
-        #system('clear')
-        #print('\r')
+        # system('clear')
+        # print('\r')
+
         try:
-            self.receivingBuffer += data 
-            if len(self.receivingBuffer) == 1: 
-                if self.receivingBuffer.decode('ascii') == RST:
+            self.receivingBuffer += data
+            if len(self.receivingBuffer) == 1:
+                if self.receivingBuffer.decode("ascii") == RST:
                     StatusManager.set_reset_status(self.beetleId)
-                    
-                if self.receivingBuffer.decode('ascii') == ACK:
+
+                if self.receivingBuffer.decode("ascii") == ACK:
                     StatusManager.set_sync_status(self.beetleId)
-                
-                self.receivingBuffer = b''
-        
+
+                self.receivingBuffer = b""
+
             elif len(self.receivingBuffer) >= 20:
                 packetData = self.receivingBuffer[0:20]
                 self.receivingBuffer = self.receivingBuffer[20:]
                 data = {}
                 isPacketCorrect = self.verify_checksum(packetData)
 
-                if isPacketCorrect == True:
-                    sequenceNumber = struct.unpack('b', packetData[0:1])[0]
-                    packetType = struct.unpack('b', packetData[1:2])[0]
-                
+                if isPacketCorrect:
+                    packetType = struct.unpack("b", packetData[1:2])[0]
                     if chr(packetType) == GUN:
-                        gunData = struct.unpack('B', packetData[2:3])[0]
-                        data['beetleId'] = self.beetleId
-                        data['sequenceNumber'] = sequenceNumber
-                        data['packetType'] = chr(packetType)
-                        data['dataValue'] = gunData
-                        data['isPacketCorrupted'] = not isPacketCorrect
-                        StatisticsManager.set_beetle_statistics(self.beetleId, data)
-                  
+                        print("Gun packet received")
+                        if time.time() - self.bulletDataReceivedTime > DEBOUNCE_TIME:
+                            gunData = struct.unpack("B", packetData[2:3])[0]
+                            self.bulletDataReceivedTime = time.time()
+                            # print("gun data", gunData)
+
+                            if gunData > 0:
+                                print(f"Ammo before shot is {gunData}")
+                            else:
+                                print("Gun is out of ammo")
+                            # Shoot either ways
+
+                            self.laptopClient.send_plaintext("shoot")
+                            StatisticsManager.set_beetle_statistics(self.beetleId, data)
+                            StatusManager.set_data_ack_status(self.beetleId)
+
                     if chr(packetType) == VEST:
-                        vestData = struct.unpack('B', packetData[2:3])[0]     
-                        data['beetleId'] = self.beetleId
-                        data['sequenceNumber'] = sequenceNumber
-                        data['packetType'] = chr(packetType)
-                        data['dataValue'] = vestData
-                        data['isPacketCorrupted'] = not isPacketCorrect
-                        StatisticsManager.set_beetle_statistics(self.beetleId, data)
+                        vestData = struct.unpack("B", packetData[2:3])[0]
+                        print("Vest packet received")
+                        if time.time() - self.healthDataReceivedTime > DEBOUNCE_TIME:
+                            gunData = struct.unpack("B", packetData[2:3])[0]
+                            self.healthDataReceivedTime = time.time()
+                            # print("gun data", gunData)
+
+                            if vestData > 0:
+                                print(f"Player health before shot {vestData}")
+                            # Send hit either ways
+                            self.laptopClient.send_plaintext("hit")
+                            StatusManager.set_data_ack_status(self.beetleId)
+                            StatisticsManager.set_beetle_statistics(self.beetleId, data)
 
                     if chr(packetType) == IMU:
-                        if self.imuDataFlagCounter == 0:
-                            self.imuDataFeatureVector['timestamp'] = (datetime.now()).timestamp() 
-                            self.imuDataFeatureVector['imuDataLinearAccelX'] = struct.unpack('f', packetData[2:6])[0]
-                            self.imuDataFeatureVector['imuDataLinearAccelY'] = struct.unpack('f', packetData[6:10])[0]
-                            self.imuDataFeatureVector['imuDataLinearAccelZ'] = struct.unpack('f', packetData[10:14])[0]
+                        imuDataFeatureVector = {}
+                        imuDataFeatureVector["timestamp"] = (datetime.now()).timestamp()
+                        imuDataFeatureVector["imuDataLinearAccelX"] = (
+                            struct.unpack(">h", packetData[2:4])[0] / 1024
+                        )
+                        imuDataFeatureVector["imuDataLinearAccelY"] = (
+                            struct.unpack(">h", packetData[4:6])[0] / 1024
+                        )
+                        imuDataFeatureVector["imuDataLinearAccelZ"] = (
+                            struct.unpack(">h", packetData[6:8])[0] / 1024
+                        )
+                        imuDataFeatureVector["imuDataGyroAccelX"] = (
+                            struct.unpack(">h", packetData[8:10])[0] / 128
+                        )
+                        imuDataFeatureVector["imuDataGyroAccelY"] = (
+                            struct.unpack(">h", packetData[10:12])[0] / 128
+                        )
+                        imuDataFeatureVector["imuDataGyroAccelZ"] = (
+                            struct.unpack(">h", packetData[12:14])[0] / 128
+                        )
 
-                        if self.imuDataFlagCounter == 1:
-                            self.imuDataFeatureVector['imuDataGyroAccelX'] = struct.unpack('f', packetData[2:6])[0]
-                            self.imuDataFeatureVector['imuDataGyroAccelY'] = struct.unpack('f', packetData[2:6])[0]
-                            self.imuDataFeatureVector['imuDataGyroAccelZ'] = struct.unpack('f', packetData[2:6])[0]
-                        
-                        if self.imuDataFlagCounter == 2:
-                            self.imuDataFeatureVector['roll'] = struct.unpack('f', packetData[2:6])[0]
-                            self.imuDataFeatureVector['pitch'] = struct.unpack('f', packetData[2:6])[0]
-                            self.imuDataFeatureVector['yaw'] = struct.unpack('f', packetData[2:6])[0]
-                            #self.imuDataFeatureVector['label'] = 'Shield'
-                            self.imuDataFeatureVector['label'] = 'Reload'
+                        # DATA COLLECTION
+                        # ==========================================
+                        # imuDataFeatureVector['label'] = 'grenade'
+                        # imuDataFeatureVector["label"] = "shield"
+                        # imuDataFeatureVector['label'] = 'reload'
+                        # print(packetData)
+                        # print(imuDataFeatureVector)
+                        data_json = json.dumps(imuDataFeatureVector)
+                        self.laptopClient.send_plaintext(data_json)
+                        StatusManager.set_data_ack_status(self.beetleId)
 
-                        #imuDataLinearAccelX = struct.unpack('B', packetData[2:3])[0]
-                        #imuDataLinearAccelY = struct.unpack('B', packetData[3:4])[0]
-                        #imuDataLinearAccelZ = struct.unpack('B', packetData[4:5])[0]
-                        #imuDataGyroAccelX = struct.unpack('B', packetData[5:6])[0]
-                        #imuDataGyroAccelY = struct.unpack('B', packetData[6:7])[0]
-                        #imuDataGyroAccelZ = struct.unpack('B', packetData[7:8])[0] 
-                        #imuDataRoll = struct.unpack('B', packetData[8:9])[0] 
-                        #imuDataPitch = struct.unpack('B', packetData[9:10])[0] 
-                        #imuDataYaw = struct.unpack('B', packetData[10:11])[0] 
-                        #imuData = {}
-
-                        #imuData['imuDataLinearAccelX'] = imuDataLinearAccelX
-                        #imuData['imuDataLinearAccelY'] = imuDataLinearAccelY
-                        #imuData['imuDataLinearAccelZ'] = imuDataLinearAccelZ
-                        #imuData['imuDataGyroAccelX'] = imuDataGyroAccelX 
-                        #imuData['imuDataGyroAccelY'] = imuDataGyroAccelY
-                        #imuData['imuDataGyroAccelZ'] = imuDataGyroAccelZ 
-                        #imuData['imuDataRoll'] = imuDataRoll
-                        #imuData['imuDataPitch'] = imuDataPitch
-                        #imuData['imuDataYaw'] = imuDataYaw 
-                        
-                        data['beetleId'] = self.beetleId
-                        data['sequenceNumber'] = sequenceNumber
-                        data['packetType'] = chr(packetType)
-                        data['dataValue'] = self.imuDataFeatureVector
-                        data['isPacketCorrupted'] = not isPacketCorrect
-                        #StatisticsManager.set_beetle_statistics(self.beetleId, data)
-                        self.imuDataFlagCounter += 1
-                    
-                    if self.imuDataFlagCounter == 3:
-                        self.imuDataFlagCounter = 0
-                        print(self.imuDataFeatureVector)
-                        
-                        #myFile = open('shield_data.csv', 'a')
-                        #writer = csv.DictWriter(myFile, fieldnames=list(self.imuDataFeatureVector.keys()))
-                        #writer.writerow(self.imuDataFeatureVector)
-                        #myFile.close()
-                        
-                        
-                        #with open('shield_data.csv', 'a') as file:
-                        #    writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
-                        #        'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
-                        #        'roll', 'pitch', 'yaw', 'label'])
-                        #    writer.writerow(self.imuDataFeatureVector)
-                        
-                       #with open('reload_data.csv', 'a') as file:
-                       #     writer = csv.DictWriter(file, fieldnames=['timestamp','imuDataLinearAccelX', 'imuDataLinearAccelY', 'imuDataLinearAccelZ', 
-                       #         'imuDataGyroAccelX', 'imuDataGyroAccelY', 'imuDataGyroAccelZ', 
-                       #         'roll', 'pitch', 'yaw', 'label'])
-                       #     writer.writerow(self.imuDataFeatureVector)
-                        
-                        self.imuDataFeatureVector = {}
-                        #BufferManager.relayNodeBuffer.put(self.imuDataFeatureVector)
-                    StatusManager.set_data_ack_status(self.beetleId)
-
-                else:
-                    logging.info('Packet is corrupted!')
-                    StatusManager.set_data_nack_status(self.beetleId)
+                # else:
+                #     logging.info("Packet is corrupted!")
+                #     StatusManager.set_data_nack_status(self.beetleId)
 
             else:
-                
-                #if data is not coming out to be correct comment out these two lines 
-                #self.receivingBuffer = b''
-                print('Packet is fragmented')
-                cls.increment_num_of_fragmented_packets(self.beetleId)
-                pass 
-        except Exception as e: 
-            logging.info(f'handleNotfications: Something Went wrong. please see the exception message below:\n {e}')
+                # if data is not coming out to be correct comment out these two lines
+                # self.receivingBuffer = b''
+                print("Packet is fragmented")
+                # StatisticsManager.increment_num_of_fragmented_packets(self.beetleId)
+                pass
+        except Exception as e:
+            logging.info(
+                f"handleNotfications: Something Went wrong. please see the exception message below:\n {e}"
+            )
+            print(self.imuDataFeatureVectors)
+
 
 class BlunoDevice:
     def __init__(self, beetleId, macAddress):
@@ -524,92 +594,150 @@ class BlunoDevice:
         self.macAddress = macAddress
         self.peripheral = None
         self.blutoothInterfaceHandler = None
-        self.laptopClient  = LaptopClient('192.168.95.250',8081)
-    
+        self.laptopClient = LaptopClient("192.168.95.250", PORT)
+        self.connectedToUltra = False
+
+    # data should be string format of ascii
     def transmit_packet(self, data):
         try:
             for characteristic in self.peripheral.getCharacteristics():
-                characteristic.write(bytes(data, 'ascii'), withResponse=False)
+                # if characteristic.uuid == CHARACTERISTI:
+                characteristic.write(bytes(data, "ascii"), withResponse=False)
         except (BTLEDisconnectError, AttributeError):
             pass
         except Exception as e:
-            logging.info(f'Some thing went wrong while trying to transmit packet to {self.beetleId}, please refer to the following exception:\n {e}')
-        
-    
-    def establish_connection(self): 
+            logging.info(
+                f"Some thing went wrong while trying to transmit packet to {self.beetleId}, please refer to the following exception:\n {e}"
+            )
+
+    def connect_to_ultra96(self):
+        if LOCAL_TEST:
+            return
+        self.laptopClient.connect()
+        self.laptopClient.send_plaintext(PLAYER_JSON_DATA[self.beetleId])
+        receivedMessage = ""
+        avail = False
+        first = ""
+        while not avail:
+            avail, first = self.laptopClient.available()
+
+        receivedMessage = self.laptopClient.recv_msg(first)
+        logging.info(
+            f"Connection successfully established between relay node and ultra-96 - {receivedMessage}"
+        )
+        self.connectedToUltra = True
+
+    def close_connection_to_ultra96(self):
+        if LOCAL_TEST:
+            return
+        self.laptopClient.close()
+        logging.info(f"Closed connection between relay node and ultra-96")
+        self.connectedToUltra = False
+
+    def establish_connection(self):
         try:
             self.peripheral = Peripheral(self.macAddress)
-            self.bluetoothInterfaceHandler = BluetoothInterfaceHandler(self.beetleId)
+            self.bluetoothInterfaceHandler = BluetoothInterfaceHandler(
+                self.beetleId, self.laptopClient
+            )
             self.peripheral.withDelegate(self.bluetoothInterfaceHandler)
-            StatusManager.set_connection_status(self.beetleId)        
-            #self.laptopClient.connect()
-            #self.laptopClient.send_plaintext(PLAYER_JSON_DATA[self.beetleId])
-            #receivedMessage = self.laptopClient.recv_game_state()
-            logging.info(f'Connection successfully established between the beetle-{self.beetleId} and relay node.') 
-            logging.info(f'Connection successfully established between relay node and ultra-96.')
+            StatusManager.set_connection_status(self.beetleId)
+            logging.info(
+                f"Connection successfully established between the beetle-{self.beetleId} and relay node."
+            )
 
         except Exception as e:
-            logging.info(f'Could not connect to bluno device: {self.beetleId} due to the following exception.\n {e}')
+            logging.info(
+                f"Could not connect to bluno device: {self.beetleId} due to the following exception.\n {e}"
+            )
 
     def reset_controller(self):
         try:
             self.transmit_packet(RST)
-            self.peripheral.waitForNotifications(1.0)
+            self.peripheral.waitForNotifications(0.1)
         except (BTLEDisconnectError, AttributeError):
             pass
         except Exception as e:
-            logging.info(f'Some thing went wrong while trying to reset {self.beetleId}, please refer to the following exception:\n {e}')
-        
+            logging.info(
+                f"Some thing went wrong while trying to reset {self.beetleId}, please refer to the following exception:\n {e}"
+            )
+
     def handshake_mechanism(self, isHandshakeCompleted):
+        print("Start of handshake protocol")
         if StatusManager.get_connection_status(self.beetleId):
             self.transmit_packet(SYNC)
-            self.peripheral.waitForNotifications(1.0) 
+            self.peripheral.waitForNotifications(0.1)
 
             if StatusManager.get_sync_status(self.beetleId):
                 self.transmit_packet(ACK)
                 StatusManager.set_ack_status(self.beetleId)
                 isHandshakeCompleted = True
-                logging.info(f'Handshake Completed for beetle-{self.beetleId}\n')
+                logging.info(f"Handshake Completed for beetle-{self.beetleId}\n")
 
+        # print("End of handshake protocol", isHandshakeCompleted)
         return isHandshakeCompleted
-    
-    def transmission_protocol(self):
+
+    def transmission_protocol(self, isReceiver):
+        self.connect_to_ultra96()
         isHandshakeCompleted = False
         while True:
             try:
                 if not isHandshakeCompleted:
                     if not StatusManager.get_connection_status(self.beetleId):
-                        self.establish_connection() 
+                        print("Establishing connection")
+                        self.establish_connection()
                     if not StatusManager.get_reset_status(self.beetleId):
                         self.reset_controller()
                         StatisticsManager.clear_data_rate(self.beetleId)
                         StatisticsManager.set_start_time(self.beetleId)
 
-                    isHandshakeCompleted = self.handshake_mechanism(isHandshakeCompleted)
+                    isHandshakeCompleted = self.handshake_mechanism(
+                        isHandshakeCompleted
+                    )
+
+                    if isHandshakeCompleted:
+                        print("Starting connection")
+                        self.laptopClient.send_plaintext("start")
                 else:
-                    #regular data transfer
-                    #StatisticsManager.display_statistics()
-                    self.peripheral.waitForNotifications(0.1)
+                    if isReceiver:
+                        avail, first = self.laptopClient.available()
+                        if avail:
+                            print("Data from relay node availble")
+                            data = int(self.laptopClient.recv_msg(first))
+                            # data = self.laptopClient.recv_msg(first)
+                            print(f"Sending data [{data}] to component")
+                            if data == 130:
+                                data = 125
 
-                    if StatusManager.get_data_ack_status(self.beetleId):
-                        #self.laptopClient.send_plaintext(BufferManager.relayNodeBuffer.get())
-                        self.transmit_packet(DATA_ACK)
-                        StatusManager.clear_data_ack_status(self.beetleId)
+                            data = chr(data)
+                            self.transmit_packet(data)
+                            print("Data sent to component")
 
-                    if StatusManager.get_data_nack_status(self.beetleId):
-                        self.transmit_packet(DATA_NACK)
-                        StatusManager.clear_data_nack_status(self.beetleId)                     
-            
+                    # regular data transfer
+                    # StatisticsManager.display_statistics()
+                    self.peripheral.waitForNotifications(0.01)
+
+                    # if StatusManager.get_data_ack_status(self.beetleId):
+                    #     # self.laptopClient.send_plaintext(BufferManager.relayNodeBuffer.get())
+                    #     self.transmit_packet(DATA_ACK)
+                    #     StatusManager.clear_data_ack_status(self.beetleId)
+                    #
+                    # if StatusManager.get_data_nack_status(self.beetleId):
+                    #     self.transmit_packet(DATA_NACK)
+                    #     StatusManager.clear_data_nack_status(self.beetleId)
+
             except KeyboardInterrupt:
-                logging('Program terminated due a keyboard interrupt')
-                self.peripheral.disconnect() 
-            
-            #except Exception as e: 
-                #logging.info(f'something went wrong due to the following error: \n {e}')
+                logging("Program terminated due a keyboard interrupt")
+                self.peripheral.disconnect()
+
+            # except Exception as e:
+            # logging.info(f'something went wrong due to the following error: \n {e}')
 
             except (BTLEDisconnectError, AttributeError):
-                logging.info(f'Beetle-{self.beetleId} been disconnected due to a significantly large distance from the relay node')
-                logging.info(f'Attempting Reconnection')
+                logging.info(
+                    f"Beetle-{self.beetleId} been disconnected due to a significantly large distance from the relay node"
+                )
+                logging.info(f"Attempting Reconnection")
                 isHandshakeCompleted = False
                 StatusManager.clear_connection_status(self.beetleId)
                 StatusManager.clear_reset_status(self.beetleId)
@@ -617,59 +745,100 @@ class BlunoDevice:
                 StatusManager.clear_ack_status(self.beetleId)
                 StatusManager.clear_data_ack_status(self.beetleId)
                 StatusManager.clear_data_nack_status(self.beetleId)
-                pass            
-            
-if __name__ == '__main__':
-    
+
+                print("Sending empty")
+                self.laptopClient.send_empty()
+                time.sleep(2)
+                print("Ending connection")
+                self.laptopClient.send_plaintext("end")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) >= 2:
+        for arg in sys.argv[1:]:
+            if arg == "local":
+                LOCAL_TEST = True
+            elif arg.startswith("-p"):
+                PORT = int(arg[2:])
+            elif arg.startswith("-m"):
+                MODE = int(arg[2:])
+
     format = "%(asctime)s: %(message)s"
-    logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")  
-    
-    #Player-1
+    logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
+
+    # Player-1
     beetle0 = BlunoDevice(PLAYER_1_GUN, MAC_ADDRESSES[PLAYER_1_GUN])
     beetle1 = BlunoDevice(PLAYER_1_VEST, MAC_ADDRESSES[PLAYER_1_VEST])
     beetle2 = BlunoDevice(PLAYER_1_IMU, MAC_ADDRESSES[PLAYER_1_IMU])
-    
-    #Player-2
+
+    # Player-2
     beetle3 = BlunoDevice(PLAYER_2_GUN, MAC_ADDRESSES[PLAYER_2_GUN])
     beetle4 = BlunoDevice(PLAYER_2_VEST, MAC_ADDRESSES[PLAYER_2_VEST])
     beetle5 = BlunoDevice(PLAYER_2_IMU, MAC_ADDRESSES[PLAYER_2_IMU])
-    
-    #Testers
+
+    # Testers
     beetle6 = BlunoDevice(TEST_GUN, MAC_ADDRESSES[TEST_GUN])
     beetle7 = BlunoDevice(TEST_VEST, MAC_ADDRESSES[TEST_VEST])
     beetle8 = BlunoDevice(TEST_IMU, MAC_ADDRESSES[TEST_IMU])
-    
-    #Instantiation of Threads 
-    logging.info('Instantiation of threads')
-    #beetleThread0 = threading.Thread(target=beetle0.transmission_protocol, args=())
-    #beetleThread1 = threading.Thread(target=beetle1.transmission_protocol, args=()) 
-    #beetleThread2 = threading.Thread(target=beetle2.transmission_protocol, args=())
-    #beetleThread3 = threading.Thread(target=beetle3.establish_connection, args=())
-    #beetleThread4 = threading.Thread(target=beetle4.establish_connection, args=())
-    beetleThread5 = threading.Thread(target=beetle5.transmission_protocol, args=())
-    #beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=())
-    #beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=())
-    #beetleThread8 = threading.Thread(target=beetle8.transmission_protocol, args=())
-    
-    #Starting beetle Threads
-    #beetleThread0.start()
-    #beetleThread1.start()
-    #beetleThread2.start()
-    #beetleThread3.start()
-    #beetleThread4.start()
-    beetleThread5.start()
-    #beetleThread6.start()
-    #beetleThread7.start()
-    #beetleThread8.start()
 
-    #Terminating beetle Threads
-    #beetleThread0.join()
-    #beetleThread1.join()
-    #beetleThread2.join()
-    #beetleThread3.join()
-    #beetleThread4.join()
-    beetleThread5.join()
-    #beetleThread6.join()
-    #beetleThread7.join()
-    #beetleThread8.join()
+    # Instantiation of Threads
+    logging.info("Instantiation of threads")
+    beetleThread0 = threading.Thread(target=beetle0.transmission_protocol, args=(True,))
+    beetleThread1 = threading.Thread(target=beetle1.transmission_protocol, args=(True,))
+    beetleThread2 = threading.Thread(
+        target=beetle2.transmission_protocol, args=(False,)
+    )
+    beetleThread3 = threading.Thread(target=beetle3.transmission_protocol, args=(True,))
+    beetleThread4 = threading.Thread(target=beetle4.transmission_protocol, args=(True,))
+    beetleThread5 = threading.Thread(
+        target=beetle5.transmission_protocol, args=(False,)
+    )
+    beetleThread6 = threading.Thread(target=beetle6.transmission_protocol, args=(True,))
+    beetleThread7 = threading.Thread(target=beetle7.transmission_protocol, args=(True,))
+    beetleThread8 = threading.Thread(
+        target=beetle8.transmission_protocol, args=(False,)
+    )
 
+    try:
+        if MODE == 1:
+            beetleThread0.start()
+            beetleThread1.start()
+            beetleThread2.start()
+
+            beetleThread0.join()
+            beetleThread1.join()
+            beetleThread2.join()
+        if MODE == 2:
+            beetleThread3.start()
+            beetleThread4.start()
+            beetleThread5.start()
+
+            beetleThread3.join()
+            beetleThread4.join()
+            beetleThread5.join()
+        if MODE == 3:
+            beetleThread0.start()
+            beetleThread1.start()
+            beetleThread2.start()
+            beetleThread3.start()
+            beetleThread4.start()
+            beetleThread5.start()
+
+            beetleThread0.join()
+            beetleThread1.join()
+            beetleThread2.join()
+            beetleThread3.join()
+            beetleThread4.join()
+            beetleThread5.join()
+        if MODE == 4:
+            beetleThread0.start()
+            beetleThread1.start()
+            beetleThread3.start()
+            beetleThread4.start()
+
+            beetleThread0.join()
+            beetleThread1.join()
+            beetleThread3.join()
+            beetleThread4.join()
+    except KeyboardInterrupt:
+        exit()

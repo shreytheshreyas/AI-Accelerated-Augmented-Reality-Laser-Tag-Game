@@ -14,42 +14,58 @@ Your choice: """
 # Communicates with eval_server
 class LaptopClient:
     def __init__(self, server_name, server_port):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_name = server_name
         self.server_port = server_port
+        self.socket = None
+        self.ssh_tunnel = None
+        self.server_tunnel = None
 
     def connect(self):
-        ssh_tunnel = open_tunnel(
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.settimeout(0.5)
+
+        self.ssh_tunnel = open_tunnel(
             ("stu.comp.nus.edu", 22),
-            ssh_username="shreyas8",
+            ssh_username="kaijiel",
             remote_bind_address=(self.server_name, 22),
-            block_on_close=False,
         )
-        ssh_tunnel.start()
+        self.ssh_tunnel.start()
         print("Set up tunnel to Ultra96")
 
-        server_tunnel = open_tunnel(
-            ssh_address_or_host=("127.0.0.1", ssh_tunnel.local_bind_port),
+        self.server_tunnel = open_tunnel(
+            ssh_address_or_host=("127.0.0.1", self.ssh_tunnel.local_bind_port),
             remote_bind_address=("127.0.0.1", self.server_port),
             # ssh_password="xilinxB13capstone",
             ssh_password="xilinx",
             ssh_username="xilinx",
-            block_on_close=False,
         )
-        server_tunnel.start()
+        self.server_tunnel.start()
         print("Set up tunnel to Server on Ultra96")
 
-        self.socket.connect(("localhost", server_tunnel.local_bind_port))
+        # print("local bind port =", self.server_tunnel.local_bind_port)
+        self.socket.connect(("localhost", self.server_tunnel.local_bind_port))
         print("Connected to server on Ultra96")
-        
-    def close():
-        self.socket.close()
 
-    def recv_game_state(self):
-        game_state_received = None
+    def close(self):
+        self.server_tunnel.close()
+        self.ssh_tunnel.close()
+        self.ssh_tunnel = None
+        self.server_tunnel = None
+        self.socket.close()
+        self.socket = None
+
+    def available(self):
+        try:
+            _d = self.socket.recv(1)
+            return True, _d
+        except socket.timeout:
+            return False, ""
+
+    def recv_msg(self, d):
+        msg = None
         try:
             # recv length followed by '_' followed by cypher
-            data = b""
+            data = d
             while not data.endswith(b"_"):
                 _d = self.socket.recv(1)
                 if not _d:
@@ -75,13 +91,12 @@ class LaptopClient:
                 return None
 
             msg = data.decode("utf8")
-            game_state_received = msg
 
         except ConnectionResetError:
             print("Connection Reset")
             return None
 
-        return game_state_received
+        return msg
 
     def send_plaintext(self, plaintext):
         success = True
@@ -95,26 +110,32 @@ class LaptopClient:
             success = False
         return success
 
-    def run(self):
+    def send_empty(self):
+        try:
+            self.socket.sendall("".encode("utf8"))
+        except OSError:
+            print("Connection terminated")
+
+    def run_test(self):
         sensors = ["gun", "vest", "glove"]
         actions = {"gun": "shoot", "vest": "hit", "glove": "glove_movement"}
 
         sensor = ""
 
         while not sensor:
-            
+            user_input = input()
             if user_input not in "1234":
                 print("Input invalid, try again")
                 continue
-            
-            #put this in the connection established 
+
+            # put this in the connection established
             sensor = sensors[int(user_input) - 1]
             send_json = '{"player": "p1", "sensor": "' + sensor + '"}'
 
             print("Sending", send_json)
             self.send_plaintext(send_json)
 
-        receivedMsg = self.recv_game_state()
+        receivedMsg = self.recv_msg("")
         if not receivedMsg:
             return
 
@@ -133,7 +154,9 @@ class LaptopClient:
             print("Sending", action)
             self.send_plaintext(action)
 
-            receivedMsg = self.recv_game_state()
+            avail, first = self.laptopClient.available()
+            if avail:
+                self.laptopClient.recv_msg(first)
             if not receivedMsg:
                 break
 
@@ -148,8 +171,8 @@ class LaptopClient:
 if __name__ == "__main__":
     client = LaptopClient("192.168.95.250", 8080)
     client.connect()
-    
+
     try:
-        client.run()
+        client.run_test()
     except KeyboardInterrupt:
         client.stop()

@@ -14,6 +14,12 @@
 #define SENSOR_DATA 20
 #define DATA_RATE 115200
 #define TIMEOUT 50
+#define IR_RATIO 32699
+#define DATA_PACKET_SPAM_COUNT 5
+#define DATA_PACKET_SPAM_INTERVAL 100
+
+#define INIT_HEALTH 100
+
 
 //Defining packet types
 #define SYNC 'S'
@@ -30,36 +36,37 @@ TM1637Display display = TM1637Display(CLK, DIO);
 
 const uint16_t PLAYER_1_ADDRESS = 0x0102; //Address for Player 1's Shot
 const uint16_t PLAYER_2_ADDRESS = 0x0105; //Address for Player 2's Shot
-bool isShot = false;  //To indicate if hit is registered
+
+const uint8_t command = 'X'; //1 for player 1
 uint8_t shotID;
-uint8_t shotCounter = 0;
-uint8_t health = 100;
+uint8_t health = INIT_HEALTH;
 uint8_t lifeStatus = 0;
 bool sendData = false;
-unsigned long sensorDelayStartTime = 0;
+unsigned long sensorDelayStartTime;
+unsigned long currentMillis;
+int i;
 
 const uint8_t DEAD[] = {
-  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E,   // D
-  SEG_A | SEG_D | SEG_E | SEG_F | SEG_G,   // E
-  SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,   // A
-  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E            // D
+    SEG_A | SEG_B | SEG_C | SEG_D | SEG_E,           // D
+    SEG_A | SEG_D | SEG_E | SEG_F | SEG_G,           // E
+    SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,   // A
+    SEG_A | SEG_B | SEG_C | SEG_D | SEG_E            // D
 };
 
 int melody[] = {
-
-  NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4
+    NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4
 };
 
 // note durations: 4 = quarter note, 8 = eighth note, etc.:
 int noteDurations[] = {
 
-  4, 8, 8, 4, 4, 4, 4, 4
+    4, 8, 8, 4, 4, 4, 4, 4
 };
 
 
 //Class definition for protocol
 class Protocol {
-  private:
+private:
     int sensorDataIdx;
     int sequenceNumber;
     int previousTime;
@@ -67,108 +74,126 @@ class Protocol {
     int sensorData[SENSOR_DATA];
     byte packet[PACKET_SIZE];
 
-  public:
+public:
     Protocol();
     int calculate_checksum(void);
     void clear_serial_buffer(void);
     void get_sensor_data(void);
     void initialize_packet_data(void);
     void start_communication(void);
+    void send_data(void);
 };
 
-//global variable declarations 
+//global variable declarations
 bool hasHandshakeStarted;
 bool hasHandshakeEnded;
 Protocol* communicationProtocol;
 
 
-//function definitions 
+//function definitions
 Protocol::Protocol() {
-  this->sensorDataIdx = 0; 
-  this->sequenceNumber = 0;
-  this->previousTime = 0;
-  this->currentTime = 0;
-  
-  for(int idx = 0; idx < SENSOR_DATA; idx++)
-    this->sensorData[idx] = 10 + idx; //In acutal implementation will change to 0
+    this->sensorDataIdx = 0;
+    this->sequenceNumber = 0;
+    this->previousTime = 0;
+    this->currentTime = 0;
 
-  for(int idx = 0; idx < PACKET_SIZE; idx++)
-    this->packet[idx] = 0;
+    for(int idx = 0; idx < SENSOR_DATA; idx++)
+        this->sensorData[idx] = 10 + idx; //In acutal implementation will change to 0
+
+    for(int idx = 0; idx < PACKET_SIZE; idx++)
+        this->packet[idx] = 0;
 }
 
 int Protocol::calculate_checksum(void) {
-  uint8_t checksum = 0;
-  
-  for(int idx = 0; idx < PACKET_SIZE-1; idx++)
-    checksum ^= this->packet[idx];
+    uint8_t checksum = 0;
 
-  return checksum;
+    for(int idx = 0; idx < PACKET_SIZE-1; idx++)
+        checksum ^= this->packet[idx];
+
+    return checksum;
 }
 
 void Protocol::clear_serial_buffer() {
-  while(Serial.available()) 
-    byte dummy = Serial.read();
+    while(Serial.available())
+        byte dummy = Serial.read();
 }
 
 void Protocol::get_sensor_data() {
-  return;
+    return;
 }
 
 void Protocol::initialize_packet_data() {
-  this->packet[0] = this->sequenceNumber;
-  this->packet[1] = VEST_DATA;
-  this->packet[2] = lifeStatus;
-  this->packet[PACKET_SIZE - 1] = this->calculate_checksum(); 
+
+    this->packet[0] = this->sequenceNumber;
+    this->packet[1] = VEST_DATA;
+    this->packet[2] = health;
+    this->packet[PACKET_SIZE - 1] = this->calculate_checksum();
 }
 
 void Protocol::start_communication() {
-   currentTime = millis();
 
-//    if (!Serial.available())
-//      return;
-      
     byte receivedData = Serial.read();
 
     switch(receivedData) {
-      case SYNC: 
-                 hasHandshakeStarted = true;
-                 hasHandshakeEnded = false;
-                 Serial.write(ACK);
-                 break;
+    case SYNC:
+        hasHandshakeStarted = true;
+        hasHandshakeEnded = false;
+        Serial.write(ACK);
+        break;
 
-      case ACK: 
-                hasHandshakeStarted = false;
-                hasHandshakeEnded = true;
-                break;
+    case ACK:
+        hasHandshakeStarted = false;
+        hasHandshakeEnded = true;
+        break;
 
-      case DATA_ACK: 
-                this->sequenceNumber++;
-                this->sensorDataIdx = (this->sensorDataIdx + 1) % 20;
-                
-                break;
+    case DATA_ACK:
+        this->sequenceNumber++;
+        break;
 
-      case DATA_NACK:
-                //Some code to handle this scenario
-                break;
-                
-      case RST: hasHandshakeStarted = false;
-                hasHandshakeEnded = false;
-//                this->clear_serial_buffer();
-                Serial.write(RST);
-                break;
+    case DATA_NACK:
+        //Some code to handle this scenario
+        break;
 
-      case FIN: 
-                //Some code to handle this scenario
-                break;
+    case RST:
+        hasHandshakeStarted = false;
+        hasHandshakeEnded = false;
+        Serial.write(RST);
+        break;
+
+    case FIN:
+        //Some code to handle this scenario
+        break;
     }
+}
 
-  if ( (hasHandshakeEnded) && (currentTime -  previousTime > TIMEOUT) &&  receivedData != ACK && sendData) { 
-    Serial.write((byte*)&packet, sizeof(packet));
-    sendData = false;
-    previousTime = currentTime;
-  }
+void sensorDelay(long interval) {
+    sensorDelayStartTime = millis();
+    currentMillis = millis();
 
-  this->clear_serial_buffer();
+    while(currentMillis - sensorDelayStartTime < interval) {
+        currentMillis = millis();
+    }
+}
+
+
+void Protocol::send_data() {
+    this->currentTime = millis();
+    for(int i =0; i < DATA_PACKET_SPAM_COUNT; i++) {
+        Serial.write((byte*)&packet, sizeof(packet));
+        sensorDelay(DATA_PACKET_SPAM_INTERVAL);
+    }
+    sendData= false;
+    this->previousTime = this->currentTime;
+}
+
+void deadTune() {
+    for (int thisNote = 0; thisNote < 8; thisNote++) {
+        int noteDuration = 1000 / noteDurations[thisNote];
+        tone(BUZZER_PIN, melody[thisNote], noteDuration);
+        int pauseBetweenNotes = noteDuration * 1.30;
+        sensorDelay(pauseBetweenNotes);
+        noTone(8);
+    }
 }
 
 void sensorDelay(long interval) {
@@ -190,67 +215,63 @@ void deadTune(){
 }
 
 void setup() {
-  Serial.begin(DATA_RATE);
-  pinMode(BUZZER_PIN,OUTPUT);  
-  display.setBrightness(5);
-  display.showNumberDec(health);
-  IrReceiver.begin(IR_RCV_PIN); //Start receiving
-  hasHandshakeStarted = false;
-  hasHandshakeEnded = false;
-  communicationProtocol = new Protocol();
+
+    Serial.begin(DATA_RATE);
+    pinMode(BUZZER_PIN,OUTPUT);
+    display.setBrightness(5);
+    display.showNumberDec(health);
+    IrReceiver.begin(IR_RCV_PIN); //Start receiving
+    hasHandshakeStarted = false;
+    hasHandshakeEnded = false;
+    communicationProtocol = new Protocol();
 }
 
 void loop() {
-//  Serial.flush();
-    if (IrReceiver.decode()) {  
-    
-//    IrReceiver.printIRResultShort(&Serial);
-//    Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);
-    
-    if (IrReceiver.decodedIRData.command == 0x02) {   //if hit by player 2's shot
-      isShot = true;
-           
-      shotID = IrReceiver.decodedIRData.command;  //shotID of the player that hit you
-//      Serial.println("Received signal");  //debug
-       
-      if (isShot == true && health == 0) {
-//        lifeStatus = 13;
-        sendData = true;
-        display.setSegments(DEAD);
-        deadTune();
-        health = 0;
-      } 
-      else if (isShot == true){
-        shotCounter += 1;
-//        lifeStatus = 1; 
-        sendData = true;
-        health = 100 - shotCounter*10;
-        tone(BUZZER_PIN,5000,100);
-        isShot = false;
-
-        if (health == 0) {
-          display.setSegments(DEAD);
-          deadTune();
-          sensorDelayStartTime = millis();
-          sensorDelay(100);
-//          health = 100; //uncomment later
-          display.showNumberDec(health);
-        }
-        else {
-          display.showNumberDec(health);
-          sensorDelayStartTime = millis();
-          sensorDelay(100);
-        }
-
-      }       
+    if (!hasHandshakeEnded) {
+        communicationProtocol->start_communication();
+        return;
     }
-    IrReceiver.begin(IR_RCV_PIN); //continue receiving IR signals
-//     IrReceiver.resume();
-  }
+    if (IrReceiver.decode()) {
+        if (IrReceiver.decodedIRData.command == command) {
+            sendData = true;
+            communicationProtocol->initialize_packet_data();
+            communicationProtocol->send_data();
+            health -= 10;
+            tone(BUZZER_PIN,5000,100);
+            display.showNumberDec(health);
 
-  lifeStatus = (health == 0) ? 13 : 1;
-  
-  communicationProtocol->initialize_packet_data();
-  communicationProtocol->start_communication();
-//  communicationProtocol->clear_serial_buffer();
+            sendData = true;
+            if (health == 0) {
+                display.setSegments(DEAD);
+                deadTune();
+                sensorDelay(1000);
+                health = 100;
+                display.showNumberDec(health);
+            }
+        }
+        sensorDelay(1000);
+        IrReceiver.begin(IR_RCV_PIN); //continue receiving IR signals
+    }
+    if (Serial.available()) {
+        int data = Serial.read();
+        if ((char)data == '\n') {
+            return;
+        }
+        if ((char)data == RST) {
+            hasHandshakeStarted = false;
+            hasHandshakeEnded = false;
+            Serial.write(RST);
+            return;
+        }
+
+        if (data == 125) {
+            data = 130;
+        }
+        if (health != data) {
+            health = data;
+            display.showNumberDec(health);
+        }
+        sensorDelay(200);
+        IrReceiver.begin(IR_RCV_PIN); // CANNOT REMOVE
+    }
 }
