@@ -1,4 +1,4 @@
-import json
+import logging
 import time
 
 from GameState import GameState
@@ -7,6 +7,7 @@ from Helper import Actions
 TWO_PLAYER = True
 
 TURN_MAX_TIME = 5
+NEXT_TURN_TIME = 8
 
 SENSOR_MAPPING = {"gun": "bullets", "vest": "hp"}
 
@@ -14,6 +15,7 @@ SENSOR_MAPPING = {"gun": "bullets", "vest": "hp"}
 class GameEngine:
     def __init__(
         self,
+        connected_to_eval,
         opp_in_frames,
         action_queue,
         update_beetle_queue,
@@ -25,6 +27,7 @@ class GameEngine:
         logs_queue,
     ):
         self.game_state = GameState()
+        self.connected_to_eval = connected_to_eval
         self.action_queue = action_queue
         self.update_beetle_queue = update_beetle_queue
         self.eval_req_queue = eval_req_queue
@@ -38,7 +41,12 @@ class GameEngine:
         self.complete = {}
         self.turn_end_time = 0.0
         self.turn_time_left = 0
+        self.next_turn_time = 0
         self.reset_turn()
+
+    def clear_action_queue(self):
+        while not self.action_queue.empty():
+            self.action_queue.get()
 
     def update_players(self, update):
         player_1 = self.game_state.p1
@@ -57,8 +65,14 @@ class GameEngine:
         self.turn_end_time = time.time() + TURN_MAX_TIME
         self.turn_time_left = TURN_MAX_TIME
 
+    def set_delay(self):
+        self.next_turn_time = time.time() + NEXT_TURN_TIME
+
+    def is_before_delay(self):
+        return time.time() <= self.next_turn_time
+
     def reset_turn(self):
-        self.reset_timer()
+        self.clear_action_queue()
         self.complete = {"p1": False, "p2": False}
 
         self.signals = {
@@ -75,16 +89,7 @@ class GameEngine:
         }
 
     def check_turn(self, player):
-        if (
-            # (
-            #     self.signals[player]["action"] == Actions.shoot
-            #     and self.signals[player]["opp_hit"]
-            # )
-            self.signals[player]["action"] == Actions.shoot
-            or self.signals[player]["action"] == Actions.grenade
-            or self.signals[player]["action"] == Actions.reload
-            or self.signals[player]["action"] == Actions.shield
-        ):
+        if self.signals[player]["action"] in Actions.all:
             self.complete[player] = True
 
     def get_opp(self, player):
@@ -100,27 +105,14 @@ class GameEngine:
 
         return self.complete["p1"] or self.complete["p2"]
 
-    def after_delay(self):
-        self.turn_time_left = self.turn_end_time - time.time()
-        # self.logs_queue.put(f"Checking is turn over, time left = {self.turn_time_left}")
-        # if self.turn_time_left <= 0:
-        # self.logs_queue.put("turn is over")
-
-        return self.turn_time_left <= 0
-
-    def is_turn_over(self):
-        self.turn_time_left = self.turn_end_time - time.time()
-        # self.logs_queue.put(f"Checking is turn over, time left = {self.turn_time_left}")
-        # if self.turn_time_left <= 0:
-        # self.logs_queue.put("turn is over")
-
-        return self.turn_time_left <= 0
-
     def is_logged_out(self):
-        return (
+        if (
             self.game_state.p1.action == Actions.logout
-            or self.game_state.p2.action == Actions.logout
-        )
+            and self.game_state.p2.action == Actions.logout
+        ):
+            self.logs_queue.put("Logging out")
+            return True
+        return False
 
     def _run(self):
         game_state = self.game_state.get_dict()
@@ -130,6 +122,11 @@ class GameEngine:
         game_start = True
 
         while game_start:
+            if self.is_before_delay():
+                while self.is_before_delay():
+                    pass
+                self.reset_turn()
+
             if not self.action_queue.empty():
                 # self.logs_queue.put("Getting from action queue")
                 player, action = self.action_queue.get()
@@ -150,12 +147,11 @@ class GameEngine:
                     continue
 
                 if action in Actions.all:
-                    if self.signals[player]["action"] == Actions.no:
-                        self.signals[player]["action"] = action
-                        # if action == "shoot":
-                        #     self.reset_timer()
-                        # if self.signals[opp]["action"] == Actions.no:
-                        #     self.reset_timer()
+                    self.signals[player]["action"] = action
+                    # if action == "shoot":
+                    #     self.reset_timer()
+                    # if self.signals[opp]["action"] == Actions.no:
+                    #     self.reset_timer()
                 elif action == Actions.hit:
                     if not self.signals[opp]["opp_hit"]:
                         self.signals[opp]["opp_hit"] = True
@@ -167,6 +163,10 @@ class GameEngine:
 
             # if self.is_complete() and self.after_delay():
             if self.is_complete():
+                with self.connected_to_eval.get_lock():
+                    if not self.connected_to_eval.value:
+                        self.reset_turn()
+
                 action_p1 = self.signals["p1"]["action"]
                 action_p2 = self.signals["p2"]["action"]
 
@@ -194,30 +194,22 @@ class GameEngine:
                 player_1.update(action_p1, action_p2, action_p2_is_valid)
                 player_2.update(action_p2, action_p1, action_p1_is_valid)
 
+                if self.is_logged_out():
+                    game_start = False
+
                 game_state = self.game_state.get_dict()
 
-                # self.logs_queue.put("[Game State Sent]:\n" + json.dumps(game_state, indent=4))
                 self.eval_req_queue.put(game_state)
                 self.eval_req_console_queue.put(game_state)
                 updated_game_state = self.eval_resp_queue.get()
                 self.eval_resp_console_queue.put(updated_game_state)
 
                 self.update_players(updated_game_state)
-
-                # Empty queue
-                while not self.action_queue.empty():
-                    self.action_queue.get()
-                # self.logs_queue.put(
-                #     "[Game State Updated]:\n"
-                #     + json.dumps(self.game_state.get_dict(), indent=4)
-                # )
-
                 self.vis_queue.put(updated_game_state)
 
-                if self.is_logged_out():
-                    game_start = False
-
                 self.reset_turn()
+                self.set_delay()
+        self.logs_queue.put("End of Game Engine Run")
 
     def run(self):
         try:

@@ -21,6 +21,7 @@ class Ultra96:
         self.eval_host = eval_host
         self.eval_port = eval_port
 
+        self.connected_to_eval = mp.Value("i", 0)
         self.opp_in_frames = mp.Array("i", [0] * 2)
         self.connected = mp.Array("i", [False] * 6)
 
@@ -36,6 +37,7 @@ class Ultra96:
         self.eval_resp_console_queue = mp.Queue()
 
         self.engine = GameEngine(
+            self.connected_to_eval,
             self.opp_in_frames,
             self.action_queue,
             self.update_beetle_queue,
@@ -94,6 +96,8 @@ class Ultra96:
 
             _ = input("")
             self.connect_to_eval()
+            with self.connected_to_eval.get_lock():
+                self.connected_to_eval.value = 1
             eval_process.start()
 
             console_process.join()
@@ -131,5 +135,5 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    ultra96 = Ultra96("127.0.0.1", relay_port, "127.0.0.1", eval_port)
+    ultra96 = Ultra96("127.0.0.1", relay_port, "137.132.92.184", 9999)
     ultra96.start_game()

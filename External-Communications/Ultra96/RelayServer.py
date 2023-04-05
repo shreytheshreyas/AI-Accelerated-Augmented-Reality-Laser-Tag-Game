@@ -144,8 +144,8 @@ class RelayServer:
         if msg == "start":
             self.logs_queue.put(f"Start received from {component}")
             with self.connected.get_lock():
-                if self.connected[COMPONENT_IDS[component]]:
-                    return True
+                # if self.connected[COMPONENT_IDS[component]]:
+                # return True
 
                 self.logs_queue.put(f"Not connected yet")
                 self.connected[COMPONENT_IDS[component]] = True
@@ -158,6 +158,7 @@ class RelayServer:
             return True
 
         if msg == "end":
+            self.logs_queue.put(f"End received from {component}")
             with self.connected.get_lock():
                 if not self.connected[COMPONENT_IDS[component]]:
                     return True
@@ -217,15 +218,24 @@ class RelayServer:
             self.logs_queue.put(f"Component {component} Ended")
 
     def handle_glove_conn(self, conn, in_queue, out_queue, player, component):
+        # i = 0
         try:
             while True:
+                # with self.connected.get_lock():
+                #     self.connected[0] = i
+                #     i = i + 1
+
                 msg = self.recv_msg(conn)
                 if not msg:
                     break
                 if self.update_conn_status(msg, component):
                     continue
 
-                data = json.loads(msg)
+                try:
+                    data = json.loads(msg)
+                except ValueError:
+                    print(f"Cannot load json - {msg}")
+                    continue
                 in_queue.put(list(data.values())[1:])
                 action = out_queue.get()
 

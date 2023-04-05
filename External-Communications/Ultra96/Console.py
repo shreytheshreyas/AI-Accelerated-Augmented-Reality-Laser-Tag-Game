@@ -111,6 +111,9 @@ class ConsoleInterface:
         with self.connected.get_lock():
             info_str += "[blue bold underline]Player 1:[/]\n"
             for index, component in enumerate(self.COMPONENT_NAMES):
+                # if index == 0:
+                #     info_str += f"{component}: [bold green]{self.connected[index]}[/]\n"
+                # else:
                 info_str += f"{component}: {'[bold green]Connected' if self.connected[index] else '[bold red]Disconnected'}[/]\n"
 
         with self.opp_in_frames.get_lock():
