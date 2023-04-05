@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Tue Mar 28 23:19:12 2023" VIVADOVERSION="2019.1">
+<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Wed Apr  5 13:00:09 2023" VIVADOVERSION="2019.1">
 
   <SYSTEMINFO ARCH="zynquplus" BOARD="avnet.com:ultra96v2:part0:1.2" DEVICE="xczu3eg" NAME="mlp_fpga_design" PACKAGE="sbva484" SPEEDGRADE="-1"/>
 
@@ -3777,10 +3777,10 @@
         </BUSINTERFACE>
       </BUSINTERFACES>
     </MODULE>
-    <MODULE COREREVISION="2112963166" FULLNAME="/mlp_solution_hls_0" HWVERSION="1.0" INSTANCE="mlp_solution_hls_0" IPTYPE="PERIPHERAL" IS_ENABLE="1" MODCLASS="PERIPHERAL" MODTYPE="mlp_solution_hls" VLNV="xilinx.com:hls:mlp_solution_hls:1.0">
+    <MODULE COREREVISION="2112974097" FULLNAME="/mlp_solution_hls_0" HWVERSION="1.0" INSTANCE="mlp_solution_hls_0" IPTYPE="PERIPHERAL" IS_ENABLE="1" MODCLASS="PERIPHERAL" MODTYPE="mlp_solution_hls" VLNV="xilinx.com:hls:mlp_solution_hls:1.0">
       <DOCUMENTS/>
       <PARAMETERS>
-        <PARAMETER NAME="Component_Name" VALUE="mlp_fpga_design_mlp_solution_hls_0_7"/>
+        <PARAMETER NAME="Component_Name" VALUE="mlp_fpga_design_mlp_solution_hls_0_11"/>
         <PARAMETER NAME="clk_period" VALUE="10"/>
         <PARAMETER NAME="machine" VALUE="64"/>
         <PARAMETER NAME="combinational" VALUE="0"/>
@@ -3885,10 +3885,10 @@
         </BUSINTERFACE>
       </BUSINTERFACES>
     </MODULE>
-    <MODULE COREREVISION="2112963197" FULLNAME="/mlp_solution_hls_left_0" HWVERSION="1.0" INSTANCE="mlp_solution_hls_left_0" IPTYPE="PERIPHERAL" IS_ENABLE="1" MODCLASS="PERIPHERAL" MODTYPE="mlp_solution_hls_left" VLNV="xilinx.com:hls:mlp_solution_hls_left:1.0">
+    <MODULE COREREVISION="2112974093" FULLNAME="/mlp_solution_hls_left_0" HWVERSION="1.0" INSTANCE="mlp_solution_hls_left_0" IPTYPE="PERIPHERAL" IS_ENABLE="1" MODCLASS="PERIPHERAL" MODTYPE="mlp_solution_hls_left" VLNV="xilinx.com:hls:mlp_solution_hls_left:1.0">
       <DOCUMENTS/>
       <PARAMETERS>
-        <PARAMETER NAME="Component_Name" VALUE="mlp_fpga_design_mlp_solution_hls_left_0_0"/>
+        <PARAMETER NAME="Component_Name" VALUE="mlp_fpga_design_mlp_solution_hls_left_0_3"/>
         <PARAMETER NAME="clk_period" VALUE="10"/>
         <PARAMETER NAME="machine" VALUE="64"/>
         <PARAMETER NAME="combinational" VALUE="0"/>

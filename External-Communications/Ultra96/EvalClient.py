@@ -12,12 +12,13 @@ from Test import get_queue, put_queue
 
 
 class EvalClient:
-    def __init__(self, server_name, server_port, req_queue, resp_queue):
+    def __init__(self, server_name, server_port, req_queue, resp_queue, logs_queue):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.secret_key = "PLSPLSPLSPLSWORK"
         self.iv = Random.new().read(AES.block_size)
         self.req_queue = req_queue
         self.resp_queue = resp_queue
+        self.logs_queue = logs_queue
 
         self.server_name = server_name
         self.server_port = server_port
@@ -30,10 +31,12 @@ class EvalClient:
                 self.socket.connect((self.server_name, self.server_port))
                 self.connected = True
             except ConnectionRefusedError:
-                print("Connection refused. Retrying in 1 second...", end="\r")
+                self.logs_queue.put("Connection refused. Retrying in 1 second...")
                 time.sleep(1)
 
-        print(f"Connected to Eval Server at {self.server_name}:{self.server_port}")
+        self.logs_queue.put(
+            f"Connected to Eval Server at {self.server_name}:{self.server_port}"
+        )
 
     def send_ciphertext(self, plaintext):
         success = True
@@ -47,11 +50,11 @@ class EvalClient:
             self.socket.sendall(m.encode("utf-8"))
             self.socket.sendall(ciphertext)
         except OSError:
-            print("Connection terminated")
+            self.logs_queue.put("Connection terminated")
             success = False
         return success
 
-    def recv_msg(self):
+    def recv_game_state(self):
         msg = None
         try:
             data = b""
@@ -62,7 +65,7 @@ class EvalClient:
                     break
                 data += _d
             if len(data) == 0:
-                print("no more data from the client")
+                self.logs_queue.put("no more data from the client")
                 return None
 
             data = data.decode("utf-8")
@@ -76,31 +79,37 @@ class EvalClient:
                     break
                 data += _d
             if len(data) == 0:
-                print("no more data from the client")
+                self.logs_queue.put("no more data from the client")
                 return None
 
             msg = data.decode("utf-8")
 
         except ConnectionResetError:
-            print("Connection Reset")
+            self.logs_queue.put("Connection Reset")
             return None
 
         return msg
 
-    def run(self):
+    def _run(self):
         while True:
             eval_data = self.req_queue.get()
             eval_json = json.dumps(eval_data)
             self.send_ciphertext(eval_json)
 
-            recv_json = self.recv_msg()
+            recv_json = self.recv_game_state()
             if not recv_json:
                 break
 
             recv_data = json.loads(recv_json)
             self.resp_queue.put(recv_data)
 
-        self.socket.close()
+    def run(self):
+        try:
+            self.logs_queue.put("Eval Client Started")
+            self._run()
+        except KeyboardInterrupt:
+            self.socket.close()
+            self.logs_queue.put("Eval Client Ended")
 
 
 if __name__ == "__main__":
@@ -154,7 +163,6 @@ if __name__ == "__main__":
         req_process.join()
         resp_process.join()
     except KeyboardInterrupt:
-        print("\nClient Stopped")
         eval_process.terminate()
         req_process.terminate()
         resp_process.terminate()

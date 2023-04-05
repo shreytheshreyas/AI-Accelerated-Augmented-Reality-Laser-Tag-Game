@@ -32,7 +32,7 @@ class Actions:
     grenade = "grenade"
     reload = "reload"
     logout = "logout"
-    all = [no, shoot, shield, grenade, reload]
+    all = [shoot, shield, grenade, reload, logout]
     glove = [no, shield, grenade, reload, logout]
     hit = "hit"
     blasted = "blasted"

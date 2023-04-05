@@ -21,15 +21,28 @@ SENSOR_MAPPING = {"gun": "bullets", "vest": "hp"}
 
 
 class RelayServer:
-    def __init__(self, host, port, action_queue, update_beetle_queue):
+    def __init__(
+        self,
+        host,
+        port,
+        action_queue,
+        update_beetle_queue,
+        connected,
+        action_console_queue,
+        logs_queue,
+    ):
         self.host = host
         self.port = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         self.edit_conn_queue = mp.Queue()
-        self.connected = mp.Array("i", [False] * 6)
+        self.connected = connected
         self.action_queue = action_queue
+        self.action_console_queue = action_console_queue
         self.update_beetle_queue = update_beetle_queue
+        self.logs_queue = logs_queue
+
+        self.processes = {}
 
         self.glove_in_queue = {
             "p1": mp.Queue(),
@@ -45,6 +58,7 @@ class RelayServer:
             self.glove_in_queue["p2"],
             self.glove_out_queue["p1"],
             self.glove_out_queue["p2"],
+            self.logs_queue,
         )
 
     def recv_msg(self, conn):
@@ -59,7 +73,7 @@ class RelayServer:
                     break
                 data += _d
             if len(data) == 0:
-                print("no more data from the client")
+                self.logs_queue.put("no more data from the client")
                 return None
 
             data = data.decode("utf8")
@@ -73,13 +87,13 @@ class RelayServer:
                     break
                 data += _d
             if len(data) == 0:
-                print("no more data from the client")
+                self.logs_queue.put("no more data from the client")
                 return None
 
             msg = data.decode("utf8")
 
         except ConnectionResetError:
-            print("Connection Reset")
+            self.logs_queue.put("Connection Reset")
             return None
 
         return msg
@@ -92,190 +106,248 @@ class RelayServer:
             conn.sendall(m.encode("utf-8"))
             conn.sendall(plaintext.encode("utf-8"))
         except OSError:
-            print("Connection terminated")
+            self.logs_queue.put("Connection terminated")
             success = False
         return success
 
-    def update_beetles(self, update_beetle_queue, edit_conn_queue):
+    def update_beetles(self):
         conns = {
             "p1_gun": None,
             "p1_vest": None,
             "p2_gun": None,
             "p2_vest": None,
         }
+        try:
+            while True:
+                if not self.edit_conn_queue.empty():
+                    component, conn = self.edit_conn_queue.get()
+                    conns[component] = conn
 
-        while True:
-            if not edit_conn_queue.empty():
-                component, conn = edit_conn_queue.get()
-                conns[component] = conn
+                if not self.update_beetle_queue.empty():
+                    component, data = self.update_beetle_queue.get()
+                    self.logs_queue.put(
+                        f"Get from update beetle queue [{data}] {component}"
+                    )
+                    time.sleep(0.2)
+                    with self.connected.get_lock():
+                        if self.connected[COMPONENT_IDS[component]]:
+                            self.logs_queue.put(f"Sending data [{data}] to {component}")
+                            self.send_plaintext(str(data), conns[component])
+                        else:
+                            self.logs_queue.put(
+                                f"Could not send data [{data}] to {component}"
+                            )
+        except KeyboardInterrupt:
+            self.logs_queue.put("Update Beetles Ended")
 
-                print(conns)
+    def update_conn_status(self, msg, component):
+        if msg == "start":
+            self.logs_queue.put(f"Start received from {component}")
+            with self.connected.get_lock():
+                # if self.connected[COMPONENT_IDS[component]]:
+                # return True
 
-            if not update_beetle_queue.empty():
-                component, data = update_beetle_queue.get()
-                if conns[component]:
-                    print(f"Sending data [{data}] to {component}")
-                    self.send_plaintext(str(data), conns[component])
-                else:
-                    print(f"Could not send data [{data}] to {component}")
+                self.logs_queue.put(f"Not connected yet")
+                self.connected[COMPONENT_IDS[component]] = True
+                player, sensor = component.split("_")
+                if sensor == "gun" or sensor == "vest":
+                    self.logs_queue.put("put connn in action queue")
+                    self.action_queue.put((player, "conn_" + sensor))
 
-    def handle_gun_conn(self, conn, action_queue, edit_conn_queue, player, component):
-        while True:
-            msg = self.recv_msg(conn)
-            if not msg:
-                break
-            # if msg != "shoot":
-            #     print("wrong action (gun)")
-            #     break
+                self.logs_queue.put(f"Connected to {component}")
+            return True
 
-            action_queue.put((player, "shoot"))
+        if msg == "end":
+            self.logs_queue.put(f"End received from {component}")
+            with self.connected.get_lock():
+                if not self.connected[COMPONENT_IDS[component]]:
+                    return True
+                self.connected[COMPONENT_IDS[component]] = False
+                self.logs_queue.put(f"Disconnected from {component}")
+            return True
 
-        conn.close()
-        edit_conn_queue.put((component, None))
         with self.connected.get_lock():
-            self.connected[COMPONENT_IDS[component]] = False
-            print(f"Connection to {component} ended")
+            if not self.connected[COMPONENT_IDS[component]]:
+                self.logs_queue(f"Not Connected to {component}")
+                return True
 
-    def handle_vest_conn(self, conn, action_queue, edit_conn_queue, player, component):
-        while True:
-            msg = self.recv_msg(conn)
-            if not msg:
-                break
-            # if msg != "hit":
-            #     print("Wrong action (hit)")
-            #     break
+        return False
 
-            action_queue.put((player, "hit"))
+    def handle_gun_conn(self, conn, player, component):
+        try:
+            while True:
+                msg = self.recv_msg(conn)
+                if not msg:
+                    break
+                if self.update_conn_status(msg, component):
+                    continue
+                if msg != "shoot":
+                    self.logs_queue.put("wrong action (gun)")
+                    continue
+                self.action_queue.put((player, "shoot"))
+                self.action_console_queue.put((player, "shoot"))
 
-        conn.close()
-        edit_conn_queue.put((component, None))
-        with self.connected.get_lock():
-            self.connected[COMPONENT_IDS[component]] = False
-            print(f"Connection to {component} ended")
+            conn.close()
+            with self.connected.get_lock():
+                self.connected[COMPONENT_IDS[component]] = False
+                self.logs_queue.put(f"Disconnected from {component}")
+        except KeyboardInterrupt:
+            self.logs_queue.put(f"Component {component} Ended")
 
-    def handle_glove_conn(
-        self, conn, action_queue, in_queue, out_queue, player, component
-    ):
-        while True:
-            msg = self.recv_msg(conn)
-            if not msg:
-                break
+    def handle_vest_conn(self, conn, player, component):
+        try:
+            while True:
+                msg = self.recv_msg(conn)
+                if not msg:
+                    break
+                if self.update_conn_status(msg, component):
+                    continue
 
-            data = json.loads(msg)
+                if msg != "hit":
+                    self.logs_queue.put("wrong action (vest)")
+                    continue
 
-            in_queue.put(list(data.values())[1:])
+                self.action_queue.put((player, "hit"))
+                self.action_console_queue.put((player, "hit"))
 
-            action = out_queue.get()
+            conn.close()
+            with self.connected.get_lock():
+                self.connected[COMPONENT_IDS[component]] = False
+                self.logs_queue.put(f"Disconnected from {component}")
+        except KeyboardInterrupt:
+            self.logs_queue.put(f"Component {component} Ended")
 
-            if action != Actions.no:
-                print(action)
-                action_queue.put((player, action))
+    def handle_glove_conn(self, conn, in_queue, out_queue, player, component):
+        # i = 0
+        try:
+            while True:
+                # with self.connected.get_lock():
+                #     self.connected[0] = i
+                #     i = i + 1
 
-        conn.close()
-        with self.connected.get_lock():
-            self.connected[COMPONENT_IDS[component]] = False
-            print(f"Connection to {component} ended")
+                msg = self.recv_msg(conn)
+                if not msg:
+                    break
+                if self.update_conn_status(msg, component):
+                    continue
 
-    def get_player_sensor(self, conn, addr):
-        print(f"Accepted connection from {addr}")
+                try:
+                    data = json.loads(msg)
+                except ValueError:
+                    print(f"Cannot load json - {msg}")
+                    continue
+                in_queue.put(list(data.values())[1:])
+                action = out_queue.get()
+
+                # self.logs_queue.put(f"AI Output = {action}")
+
+                if action != Actions.no:
+                    self.action_queue.put((player, action))
+                    self.action_console_queue.put((player, action))
+
+            conn.close()
+            with self.connected.get_lock():
+                self.connected[COMPONENT_IDS[component]] = False
+                self.logs_queue.put(f"Disconnected from {component}")
+        except KeyboardInterrupt:
+            self.logs_queue.put(f"Component {component} Ended")
+
+    def init_conn(self, conn, addr):
+        self.logs_queue.put(f"Accepted connection from {addr}")
         msg = self.recv_msg(conn)
         if not msg:
             return "", ""
 
-        data = json.loads(msg)
-
-        if "player" not in data or "sensor" not in data:
-            print("Wrong connection type")
-            conn.close()
-            return "", ""
-
-        sensor = data["sensor"]
-        player = data["player"]
-        component = player + "_" + sensor
+        player, sensor = msg.split("_")
+        component = msg
 
         with self.connected.get_lock():
-            id = COMPONENT_IDS[component]
-            if self.connected[id]:
-                print(f"{component} already connected")
+            if self.connected[COMPONENT_IDS[component]]:
+                self.logs_queue.put(f"{component} already connected")
                 conn.close()
                 return "", ""
 
-            self.connected[id] = True
             self.send_plaintext(f"Server connection for {component} accepted", conn)
 
         if sensor == "gun" or sensor == "vest":
             self.edit_conn_queue.put((component, conn))
-            time.sleep(0.1)
-            self.action_queue.put((player, "conn_" + sensor))
 
         return player, sensor
 
-    def run(self):
-        update_process = mp.Process(
+    def _run(self):
+        self.processes["update_beetles"] = mp.Process(
             target=self.update_beetles,
-            args=(
-                self.update_beetle_queue,
-                self.edit_conn_queue,
-            ),
         )
-        update_process.start()
+        self.processes["update_beetles"].start()
 
         self.socket.bind((self.host, self.port))
         self.socket.listen(6)
-        print(f"Listening on {self.host}:{self.port}...")
+        self.logs_queue.put(f"Listening on {self.host}:{self.port}...")
 
         while True:
             conn, addr = self.socket.accept()
 
-            player, sensor = self.get_player_sensor(conn, addr)
+            player, sensor = self.init_conn(conn, addr)
             if player == "":
                 conn.close()
                 continue
             component = player + "_" + sensor
-            print(f"Connected to {component}")
+            self.logs_queue.put(f"Connection to {component} thread initilised")
 
             if sensor == "gun":
-                p = mp.Process(
+                pid = player + "_gun"
+                self.processes[pid] = mp.Process(
                     target=self.handle_gun_conn,
                     args=(
                         conn,
-                        self.action_queue,
-                        self.edit_conn_queue,
                         player,
                         component,
                     ),
                 )
-                p.start()
+                self.processes[pid].start()
+
             elif sensor == "vest":
-                p = mp.Process(
+                pid = player + "_vest"
+                self.processes[pid] = mp.Process(
                     target=self.handle_vest_conn,
                     args=(
                         conn,
-                        self.action_queue,
-                        self.edit_conn_queue,
                         player,
                         component,
                     ),
                 )
-                p.start()
+                self.processes[pid].start()
+
             elif sensor == "glove":
+                pid = player + "_glove"
+                ai_pid = player + "_ai"
                 player_ai = getattr(self.ai, player)
-                p = mp.Process(
+                self.processes[pid] = mp.Process(
                     target=self.handle_glove_conn,
                     args=(
                         conn,
-                        self.action_queue,
                         self.glove_in_queue[player],
                         self.glove_out_queue[player],
                         player,
                         component,
                     ),
                 )
-                p_ai = mp.Process(
+                self.processes[ai_pid] = mp.Process(
                     target=player_ai.run,
                 )
-                p.start()
-                p_ai.start()
+                self.processes[pid].start()
+                self.processes[ai_pid].start()
+
+    def run(self):
+        try:
+            self.logs_queue.put("Relay Server Started")
+            self._run()
+        except KeyboardInterrupt:
+            for k, v in self.processes.items():
+                self.logs_queue.put(f"Process {k} ended")
+                v.terminate()
+
+            self.logs_queue.put("Relay Server Ended")
 
 
 if __name__ == "__main__":
@@ -291,5 +363,4 @@ if __name__ == "__main__":
         relay_server_process.start()
         relay_server_process.join()
     except KeyboardInterrupt:
-        print("\nServer Stopped")
         relay_server_process.terminate()

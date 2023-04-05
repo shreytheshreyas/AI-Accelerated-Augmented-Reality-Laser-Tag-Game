@@ -8,25 +8,27 @@ from Test import put_queue
 
 
 class MQTTClient:
-    def __init__(self, vis_queue, opp_in_frames):
+    def __init__(self, vis_queue, opp_in_frames, logs_queue):
         def on_publish(client, userdata, mid, properties=None):
-            print("mid: " + str(mid))
+            self.logs_queue.put("mid: " + str(mid))
 
         def on_message(client, userdata, msg):
             msg_data = str(msg.payload.decode("utf-8"))
-            print(msg.topic + "  " + msg_data)
+            # self.logs_queue.put(msg.topic + "  " + msg_data)
             msg_json = json.loads(msg_data)
 
             index = 0 if msg_json["opp"] == "p1" else 1
 
             with self.opp_in_frames.get_lock():
-                self.opp_in_frames[index] = int(msg_json["inFrame"])
-                print(
-                    f"OppInFrame updated - p1: {bool(self.opp_in_frames[0])} p2: {bool(self.opp_in_frames[1])}"
-                )
+                if self.opp_in_frames[index] != int(msg_json["inFrame"]):
+                    self.opp_in_frames[index] = int(msg_json["inFrame"])
+                    self.logs_queue.put(
+                        f"OppInFrame updated - p1: {bool(self.opp_in_frames[0])} p2: {bool(self.opp_in_frames[1])}\r"
+                    )
 
         self.vis_queue = vis_queue
         self.opp_in_frames = opp_in_frames
+        self.logs_queue = logs_queue
 
         self.client = paho.Client(client_id="", userdata=None, protocol=paho.MQTTv5)
         self.client.on_message = on_message
@@ -40,7 +42,7 @@ class MQTTClient:
     def publish(self, data):
         self.client.publish("LaserTag/GameState", data, qos=1)
 
-    def run(self):
+    def _run(self):
         self.client.loop_start()
         while True:
             vis_data = self.vis_queue.get()
@@ -49,6 +51,13 @@ class MQTTClient:
 
     def stop(self):
         self.client.loop_stop()
+
+    def run(self):
+        try:
+            self.logs_queue.put("MQTT Client Started")
+            self._run()
+        except KeyboardInterrupt:
+            self.logs_queue.put("MQTT Client Ended")
 
 
 if __name__ == "__main__":
