@@ -6,6 +6,10 @@
 #define SENSOR_DATA 20
 #define DATA_RATE 115200
 #define TIMEOUT 50
+#define DATA_PACKET_SPAM_COUNT 5
+#define RESHOOT_TIME 5000
+
+#define DATA_PACKET_SPAM_INTERVAL 100
 //Defining packet types
 #define SYNC 'S'
 #define ACK 'A'
@@ -25,17 +29,16 @@ int buttonState = 0;
 
 const uint16_t PLAYER_1_ADDRESS = '1';
 const uint16_t PLAYER_2_ADDRESS = '2';
-const uint8_t command = 'G'; //1 for player 1
+const uint8_t command = 'X'; //1 for player 1
 
-uint8_t ammoStatus = 0;
-uint8_t repeats = 2;
-uint8_t bulletCount = 100;
+uint8_t repeats = 1;
+uint8_t bulletCount = 6;
 unsigned long sensorDelayStartTime = 0;
+unsigned long currentMillis = 0;
 byte sendDataPacket = false;
 
-// Test Timings
-unsigned long testCurr;
-unsigned long testPrev;
+unsigned long reshoot_timeout = millis();
+
 
 //Class definition for protocol
 class Protocol {
@@ -130,7 +133,6 @@ void Protocol::start_communication() {
     case RST:
         hasHandshakeStarted = false;
         hasHandshakeEnded = false;
-//                this->clear_serial_buffer();
         Serial.write(RST);
         break;
 
@@ -140,30 +142,37 @@ void Protocol::start_communication() {
     }
 }
 
-void Protocol::send_data() {
-    this->currentTime = millis();
-    if ( (hasHandshakeEnded) && (this->currentTime -  this->previousTime > TIMEOUT) && sendDataPacket) {
-        Serial.write((byte*)&packet, sizeof(packet));
-        sendDataPacket = false;
-        this->previousTime = this->currentTime;
-    }
-    /* byte dataAck = Serial.read(); */
-    /* if (dataAck != ACK) { */
-    /*     // Do something here */
-    /* } */
+void start_reshoot() {
+    reshoot_timeout = millis() + RESHOOT_TIME;
 }
 
+bool is_reshoot() {
+    return millis() < reshoot_timeout;
+}
+
+
 void sensorDelay(long interval) {
-    unsigned long currentMillis = millis();
+    sensorDelayStartTime = millis();
+    currentMillis = millis();
 
-    while(currentMillis - sensorDelayStartTime < interval)
+    while(currentMillis - sensorDelayStartTime < interval) {
         currentMillis = millis();
+    }
+}
 
+void Protocol::send_data() {
+    this->currentTime = millis();
+    for(int i =0; i < DATA_PACKET_SPAM_COUNT; i++) {
+        Serial.write((byte*)&packet, sizeof(packet));
+        sensorDelay(DATA_PACKET_SPAM_INTERVAL);
+    }
+
+    sendDataPacket = false;
+    this->previousTime = this->currentTime;
 }
 
 void outOfAmmoTune() {
     tone(buzzerPin,NOTE_D1,100);
-    sensorDelayStartTime = millis();
     sensorDelay(100); //replace with custom delay
     tone(buzzerPin,NOTE_E1,100);
 }
@@ -177,6 +186,7 @@ void setup() {
     hasHandshakeStarted = false;
     hasHandshakeEnded = false;
     communicationProtocol = new Protocol();
+    start_reshoot();
 }
 
 void loop() {
@@ -187,30 +197,29 @@ void loop() {
 
     if (Serial.available()) {
         int data = Serial.read();
-        //Serial.print(data);
         if ((char)data == RST) {
-            //Serial.print("bytes match");
-            //Serial.write('M');
             hasHandshakeStarted = false;
             hasHandshakeEnded = false;
             Serial.write(RST);
             return;
         }
 
-        sensorDelayStartTime = millis();
-        sensorDelay(50);
-        int newBulletCount = data;
-        if (bulletCount != newBulletCount) {
-            bulletCount = newBulletCount;
-            tone(buzzerPin,NOTE_C6,100);
+        if (bulletCount != data) {
+            bulletCount = data;
         }
+        sensorDelay(200);
     }
 
     buttonState = digitalRead(buttonPin);
 
     if (buttonState == 0) {
         sendDataPacket = true;
-        ammoStatus = 1;
+
+        if (is_reshoot()) {
+            IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
+            sensorDelay(200);
+            return;
+        }
 
         if (bulletCount >= 6) {
             tone(buzzerPin,NOTE_C6,100);
@@ -230,19 +239,16 @@ void loop() {
             IrSender.sendNEC(PLAYER_1_ADDRESS, command, repeats);
         } else {
             outOfAmmoTune();
-            ammoStatus = 13;
-
         }
+
+        sensorDelay(500);
         communicationProtocol->initialize_packet_data(buttonState);
         communicationProtocol->send_data();
 
-        if (bulletCount > 0) {
+        if (bulletCount > 0 ) {
             bulletCount -= 1;
         }
 
-        sensorDelayStartTime = millis();
-        sensorDelay(1000);
+        start_reshoot();
     }
-
-//  communicationProtocol->clear_serial_buffer();
 }

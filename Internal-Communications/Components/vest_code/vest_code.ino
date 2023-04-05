@@ -15,6 +15,8 @@
 #define DATA_RATE 115200
 #define TIMEOUT 50
 #define IR_RATIO 32699
+#define DATA_PACKET_SPAM_COUNT 5
+#define DATA_PACKET_SPAM_INTERVAL 100
 
 #define INIT_HEALTH 100
 
@@ -33,11 +35,13 @@ TM1637Display display = TM1637Display(CLK, DIO);
 
 const uint16_t PLAYER_1_ADDRESS = 0x0102; //Address for Player 1's Shot
 const uint16_t PLAYER_2_ADDRESS = 0x0105; //Address for Player 2's Shot
+const uint8_t command = 'X'; //1 for player 1
 uint8_t shotID;
 uint8_t health = INIT_HEALTH;
 uint8_t lifeStatus = 0;
 bool sendData = false;
-unsigned long sensorDelayStartTime = 0;
+unsigned long sensorDelayStartTime;
+unsigned long currentMillis;
 int i;
 
 const uint8_t DEAD[] = {
@@ -160,31 +164,31 @@ void Protocol::start_communication() {
     }
 }
 
+void sensorDelay(long interval) {
+    sensorDelayStartTime = millis();
+    currentMillis = millis();
+
+    while(currentMillis - sensorDelayStartTime < interval) {
+        currentMillis = millis();
+    }
+}
+
+
 void Protocol::send_data() {
     this->currentTime = millis();
-    if ( (hasHandshakeEnded) && (this->currentTime -  this->previousTime > TIMEOUT) && sendData) {
+    for(int i =0; i < DATA_PACKET_SPAM_COUNT; i++) {
         Serial.write((byte*)&packet, sizeof(packet));
-        sendData= false;
-        this->previousTime = this->currentTime;
+        sensorDelay(DATA_PACKET_SPAM_INTERVAL);
     }
-    /* byte dataAck = Serial.read(); */
-    /* if (dataAck != ACK) { */
-    /*     // Do something here */
-    /* } */
+    sendData= false;
+    this->previousTime = this->currentTime;
 }
-void sensorDelay(long interval) {
-    unsigned long currentMillis = millis();
 
-    while(currentMillis - sensorDelayStartTime < interval)
-        currentMillis = millis();
-
-}
 void deadTune() {
     for (int thisNote = 0; thisNote < 8; thisNote++) {
         int noteDuration = 1000 / noteDurations[thisNote];
         tone(BUZZER_PIN, melody[thisNote], noteDuration);
         int pauseBetweenNotes = noteDuration * 1.30;
-        sensorDelayStartTime = millis();
         sensorDelay(pauseBetweenNotes);
         noTone(8);
     }
@@ -207,13 +211,10 @@ void loop() {
         return;
     }
     if (IrReceiver.decode()) {
-        /* sensorDelay(); */
-        /* sensorDelayStartTime = millis(); */
-        if (IrReceiver.decodedIRData.command == 'G') {
+        if (IrReceiver.decodedIRData.command == command) {
             sendData = true;
             communicationProtocol->initialize_packet_data();
             communicationProtocol->send_data();
-
             health -= 10;
             tone(BUZZER_PIN,5000,100);
             display.showNumberDec(health);
@@ -222,12 +223,12 @@ void loop() {
             if (health == 0) {
                 display.setSegments(DEAD);
                 deadTune();
-                sensorDelayStartTime = millis();
                 sensorDelay(1000);
                 health = 100;
                 display.showNumberDec(health);
             }
         }
+        sensorDelay(1000);
         IrReceiver.begin(IR_RCV_PIN); //continue receiving IR signals
     }
     if (Serial.available()) {
@@ -246,11 +247,9 @@ void loop() {
             data = 130;
         }
         if (health != data) {
-            tone(BUZZER_PIN,5000,100);
             health = data;
             display.showNumberDec(health);
         }
-        sensorDelayStartTime = millis();
         sensorDelay(200);
         IrReceiver.begin(IR_RCV_PIN); // CANNOT REMOVE
     }

@@ -3,6 +3,7 @@ import logging
 import struct
 import sys
 import threading
+import time
 from collections import defaultdict
 from datetime import datetime
 from os import system
@@ -13,12 +14,14 @@ from client import LaptopClient
 
 PORT = 8081
 LOCAL_TEST = False
+MODE = 3
 
 CHARACTERISTIC = "0000dfb1-0000-1000-8000-00805f9b34fb"
 
 # Respond Message Buffer size
 NUM_OF_BEETLES = 9  # Need to update to 6 to accomodate two players
 DATA_BUFFER_SIZE = 20
+DEBOUNCE_TIME = 5
 
 # BLUNO ID's for the respective players
 PLAYER_1_GUN = 0
@@ -64,6 +67,9 @@ MAC_ADDRESSES = {
     7: "D0:39:72:BF:C8:D7",
     8: "6C:79:B8:D3:6A:A3",
 }
+
+### GUN DATA WAIT TIME
+GUN_DATA_WAIT_TIME = 0.1
 
 
 class StatisticsManager:
@@ -462,6 +468,8 @@ class BluetoothInterfaceHandler(DefaultDelegate):
         self.receivingBuffer = b""
         self.imuDataFeatureVectors = defaultdict(dict)
         self.imuDataFlagCounter = 0
+        self.bulletDataReceivedTime = time.time()
+        self.healthDataReceivedTime = time.time()
         self.imuDataFlags = {
             "linear-accel-vector": False,
             "gyro-accel-vector": False,
@@ -499,27 +507,36 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                 if isPacketCorrect:
                     packetType = struct.unpack("b", packetData[1:2])[0]
                     if chr(packetType) == GUN:
-                        gunData = struct.unpack("B", packetData[2:3])[0]
-                        # print("gun data", gunData)
+                        print("Gun packet received")
+                        if time.time() - self.bulletDataReceivedTime > DEBOUNCE_TIME:
+                            gunData = struct.unpack("B", packetData[2:3])[0]
+                            self.bulletDataReceivedTime = time.time()
+                            # print("gun data", gunData)
 
-                        if gunData > 0:
-                            print(f"Ammo before shot is {gunData}")
-                        else:
-                            print("Gun is out of ammo")
-                        # Shoot either ways
-                        self.laptopClient.send_plaintext("shoot")
+                            if gunData > 0:
+                                print(f"Ammo before shot is {gunData}")
+                            else:
+                                print("Gun is out of ammo")
+                            # Shoot either ways
 
-                        StatisticsManager.set_beetle_statistics(self.beetleId, data)
+                            self.laptopClient.send_plaintext("shoot")
+                            StatisticsManager.set_beetle_statistics(self.beetleId, data)
+                            StatusManager.set_data_ack_status(self.beetleId)
 
                     if chr(packetType) == VEST:
                         vestData = struct.unpack("B", packetData[2:3])[0]
+                        print("Vest packet received")
+                        if time.time() - self.healthDataReceivedTime > DEBOUNCE_TIME:
+                            gunData = struct.unpack("B", packetData[2:3])[0]
+                            self.healthDataReceivedTime = time.time()
+                            # print("gun data", gunData)
 
-                        if vestData > 0:
-                            print(f"Player health before shot {vestData}")
-                        # Send hit either ways
-                        self.laptopClient.send_plaintext("hit")
-
-                        StatisticsManager.set_beetle_statistics(self.beetleId, data)
+                            if vestData > 0:
+                                print(f"Player health before shot {vestData}")
+                            # Send hit either ways
+                            self.laptopClient.send_plaintext("hit")
+                            StatusManager.set_data_ack_status(self.beetleId)
+                            StatisticsManager.set_beetle_statistics(self.beetleId, data)
 
                     if chr(packetType) == IMU:
                         imuDataFeatureVector = {}
@@ -552,7 +569,7 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         # print(imuDataFeatureVector)
                         data_json = json.dumps(imuDataFeatureVector)
                         self.laptopClient.send_plaintext(data_json)
-                    StatusManager.set_data_ack_status(self.beetleId)
+                        StatusManager.set_data_ack_status(self.beetleId)
 
                 # else:
                 #     logging.info("Packet is corrupted!")
@@ -679,6 +696,7 @@ class BlunoDevice:
                     )
 
                     if isHandshakeCompleted:
+                        print("Starting connection")
                         self.laptopClient.send_plaintext("start")
                 else:
                     if isReceiver:
@@ -686,6 +704,7 @@ class BlunoDevice:
                         if avail:
                             print("Data from relay node availble")
                             data = int(self.laptopClient.recv_msg(first))
+                            # data = self.laptopClient.recv_msg(first)
                             print(f"Sending data [{data}] to component")
                             if data == 130:
                                 data = 125
@@ -727,8 +746,11 @@ class BlunoDevice:
                 StatusManager.clear_data_ack_status(self.beetleId)
                 StatusManager.clear_data_nack_status(self.beetleId)
 
-                if self.connectedToUltra:
-                    self.laptopClient.send_plaintext("end")
+                print("Sending empty")
+                self.laptopClient.send_empty()
+                time.sleep(2)
+                print("Ending connection")
+                self.laptopClient.send_plaintext("end")
 
 
 if __name__ == "__main__":
@@ -736,8 +758,10 @@ if __name__ == "__main__":
         for arg in sys.argv[1:]:
             if arg == "local":
                 LOCAL_TEST = True
-            elif arg.isdigit():
-                PORT = int(arg)
+            elif arg.startswith("-p"):
+                PORT = int(arg[2:])
+            elif arg.startswith("-m"):
+                MODE = int(arg[2:])
 
     format = "%(asctime)s: %(message)s"
     logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
@@ -776,26 +800,45 @@ if __name__ == "__main__":
     )
 
     try:
-        # Starting beetle Threads
-        beetleThread0.start()
-        beetleThread1.start()
-        beetleThread2.start()
-        beetleThread3.start()
-        beetleThread4.start()
-        beetleThread5.start()
-        # beetleThread6.start()
-        # beetleThread7.start()
-        # beetleThread8.start()
+        if MODE == 1:
+            beetleThread0.start()
+            beetleThread1.start()
+            beetleThread2.start()
 
-        # Terminating beetle Threads
-        beetleThread0.join()
-        beetleThread1.join()
-        beetleThread2.join()
-        beetleThread3.join()
-        beetleThread4.join()
-        beetleThread5.join()
-        # beetleThread6.join()
-        # beetleThread7.join()
-        # beetleThread8.join()
+            beetleThread0.join()
+            beetleThread1.join()
+            beetleThread2.join()
+        if MODE == 2:
+            beetleThread3.start()
+            beetleThread4.start()
+            beetleThread5.start()
+
+            beetleThread3.join()
+            beetleThread4.join()
+            beetleThread5.join()
+        if MODE == 3:
+            beetleThread0.start()
+            beetleThread1.start()
+            beetleThread2.start()
+            beetleThread3.start()
+            beetleThread4.start()
+            beetleThread5.start()
+
+            beetleThread0.join()
+            beetleThread1.join()
+            beetleThread2.join()
+            beetleThread3.join()
+            beetleThread4.join()
+            beetleThread5.join()
+        if MODE == 4:
+            beetleThread0.start()
+            beetleThread1.start()
+            beetleThread3.start()
+            beetleThread4.start()
+
+            beetleThread0.join()
+            beetleThread1.join()
+            beetleThread3.join()
+            beetleThread4.join()
     except KeyboardInterrupt:
         exit()

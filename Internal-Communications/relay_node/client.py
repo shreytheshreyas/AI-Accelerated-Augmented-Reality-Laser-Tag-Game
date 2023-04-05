@@ -110,6 +110,12 @@ class LaptopClient:
             success = False
         return success
 
+    def send_empty(self):
+        try:
+            self.socket.sendall("".encode("utf8"))
+        except OSError:
+            print("Connection terminated")
+
     def run_test(self):
         sensors = ["gun", "vest", "glove"]
         actions = {"gun": "shoot", "vest": "hit", "glove": "glove_movement"}
