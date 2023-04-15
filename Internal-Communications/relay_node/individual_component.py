@@ -542,13 +542,13 @@ class BluetoothInterfaceHandler(DefaultDelegate):
                         imuDataFeatureVector = {}
                         imuDataFeatureVector["timestamp"] = (datetime.now()).timestamp()
                         imuDataFeatureVector["imuDataLinearAccelX"] = (
-                            struct.unpack(">h", packetData[2:4])[0] / 1024
+                            struct.unpack(">h", packetData[2:4])[0] / 16382
                         )
                         imuDataFeatureVector["imuDataLinearAccelY"] = (
-                            struct.unpack(">h", packetData[4:6])[0] / 1024
+                            struct.unpack(">h", packetData[4:6])[0] / 16382
                         )
                         imuDataFeatureVector["imuDataLinearAccelZ"] = (
-                            struct.unpack(">h", packetData[6:8])[0] / 1024
+                            struct.unpack(">h", packetData[6:8])[0] / 16382
                         )
                         imuDataFeatureVector["imuDataGyroAccelX"] = (
                             struct.unpack(">h", packetData[8:10])[0] / 128

@@ -123,9 +123,9 @@ void Protocol::clear_serial_buffer() {
 
 
 void Protocol::initialize_imu_data(float linear_accel_x, float linear_accel_y, float linear_accel_z, float gyro_accel_x, float gyro_accel_y, float gyro_accel_z) {
-    this->sensorDataTemp.linear_accel_x = int16_t(linear_accel_x * 1024);
-    this->sensorDataTemp.linear_accel_y = int16_t(linear_accel_y * 1024);
-    this->sensorDataTemp.linear_accel_z = int16_t(linear_accel_z * 1024);
+    this->sensorDataTemp.linear_accel_x = int16_t(linear_accel_x * 16382);
+    this->sensorDataTemp.linear_accel_y = int16_t(linear_accel_y * 16382);
+    this->sensorDataTemp.linear_accel_z = int16_t(linear_accel_z * 16382);
     this->sensorDataTemp.gyro_accel_x = int16_t(gyro_accel_x * 128);
     this->sensorDataTemp.gyro_accel_y = int16_t(gyro_accel_y * 128);
     this->sensorDataTemp.gyro_accel_z = int16_t(gyro_accel_z * 128);
