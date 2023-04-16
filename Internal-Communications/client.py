@@ -1,14 +1,9 @@
+import os
 import socket
 
+from dotenv import load_dotenv
+
 from sshtunnel import open_tunnel
-
-
-PROMPT = """Choose one of the followingg beetle actions:
-  1. Gun
-  2. Vest
-  3. Glove
-  4. Quit
-Your choice: """
 
 
 # Communicates with eval_server
@@ -20,13 +15,18 @@ class LaptopClient:
         self.ssh_tunnel = None
         self.server_tunnel = None
 
+        load_dotenv()
+
+        self.soc_username = os.getenv("SOC_USERNAME")
+        self.ultra_pw = os.getenv("ULTRA_PW")
+
     def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.settimeout(0.5)
 
         self.ssh_tunnel = open_tunnel(
             ("stu.comp.nus.edu", 22),
-            ssh_username="kaijiel",
+            ssh_username=self.soc_username,
             remote_bind_address=(self.server_name, 22),
         )
         self.ssh_tunnel.start()
@@ -35,8 +35,7 @@ class LaptopClient:
         self.server_tunnel = open_tunnel(
             ssh_address_or_host=("127.0.0.1", self.ssh_tunnel.local_bind_port),
             remote_bind_address=("127.0.0.1", self.server_port),
-            # ssh_password="xilinxB13capstone",
-            ssh_password="xilinx",
+            ssh_password=self.ultra_pw,
             ssh_username="xilinx",
         )
         self.server_tunnel.start()
