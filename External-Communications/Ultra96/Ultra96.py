@@ -117,23 +117,13 @@ class Ultra96:
 
 if __name__ == "__main__":
     relay_port = 8080
-    eval_port = 2105
+    eval_addr = "137.132.92.131"
+    eval_port = 9999
 
-    if len(sys.argv) == 1:
-        print(
-            "Using default arguments of relay server port 8080 and eval client port of 2105"
-        )
-    elif len(sys.argv) == 3:
+    if len(sys.argv) == 4:
         relay_port = int(sys.argv[1])
-        eval_port = int(sys.argv[2])
-    else:
-        print("Invalid number of arguments")
-        print(
-            "python "
-            + os.path.basename(__file__)
-            + " [<Relay Server Port> <Eval Client Port>] [stub]"
-        )
-        sys.exit()
+        eval_addr = sys.argv[2]
+        eval_port = int(sys.argv[3])
 
-    ultra96 = Ultra96("127.0.0.1", relay_port, "137.132.92.184", 9999)
+    ultra96 = Ultra96("127.0.0.1", relay_port, eval_addr, eval_port)
     ultra96.start_game()
