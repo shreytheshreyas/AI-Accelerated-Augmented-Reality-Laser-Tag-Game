@@ -8,7 +8,7 @@ from Crypto import Random
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 
-from Test import get_queue, put_queue
+from Test import get_queue, print_logs, put_queue
 
 
 class EvalClient:
@@ -140,8 +140,9 @@ if __name__ == "__main__":
 
     req_queue = mp.Queue()
     resp_queue = mp.Queue()
+    logs_queue = mp.Queue()
 
-    client = EvalClient("127.0.0.1", 2108, req_queue, resp_queue)
+    client = EvalClient("127.0.0.1", 2108, req_queue, resp_queue, logs_queue)
     client.connect()
 
     eval_process = mp.Process(target=client.run)
@@ -153,16 +154,20 @@ if __name__ == "__main__":
         ),
     )
     resp_process = mp.Process(target=get_queue, args=(resp_queue,))
+    log_process = mp.Process(target=print_logs, args=(logs_queue,))
 
     try:
         eval_process.start()
         req_process.start()
         resp_process.start()
+        log_process.start()
 
         eval_process.join()
         req_process.join()
         resp_process.join()
+        log_process.join()
     except KeyboardInterrupt:
         eval_process.terminate()
         req_process.terminate()
         resp_process.terminate()
+        log_process.terminate()

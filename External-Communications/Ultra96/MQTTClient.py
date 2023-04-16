@@ -4,7 +4,7 @@ import multiprocessing as mp
 import paho.mqtt.client as paho
 from paho import mqtt
 
-from Test import put_queue
+from Test import print_logs, put_queue
 
 
 class MQTTClient:
@@ -88,8 +88,9 @@ if __name__ == "__main__":
 
     vis_queue = mp.Queue()
     opp_in_frames = mp.Array("i", [0] * 2)
+    logs_queue = mp.Queue()
 
-    mqtt_client = MQTTClient(vis_queue, opp_in_frames)
+    mqtt_client = MQTTClient(vis_queue, opp_in_frames, logs_queue)
     mqtt_process = mp.Process(target=mqtt_client.run)
     vis_process = mp.Process(
         target=put_queue,
@@ -98,13 +99,17 @@ if __name__ == "__main__":
             vis_data,
         ),
     )
+    log_process = mp.Process(target=print_logs, args=(logs_queue,))
 
     try:
         mqtt_process.start()
         vis_process.start()
+        log_process.start()
         mqtt_process.join()
         vis_process.join()
+        log_process.join()
 
     finally:
         mqtt_process.terminate()
         vis_process.terminate()
+        log_process.terminate()
