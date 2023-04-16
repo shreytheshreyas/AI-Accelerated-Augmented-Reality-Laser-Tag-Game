@@ -1,26 +1,42 @@
 import pandas as pd
 import numpy as np
 
-import os
-import json
-
 import torch
 from torch import nn, Tensor
 from torch.utils.data import Dataset
 
-from sklearn.metrics import confusion_matrix, balanced_accuracy_score
+from sklearn.metrics import roc_auc_score, balanced_accuracy_score
 
-TRAIN_FILE = "train_data.csv"
-TEST_FILE = "test_data.csv"
 
-LAYER_1_SIZE = 61
-LAYER_2_SIZE = 40 
+# ============= right =================
+
+TRAIN_FILE_R = "train_data_pca.csv"
+TEST_FILE_R = "test_data_pca.csv"
+
+OUTPUT_WEIGHTS_R = "weights_tensor.txt"
+OUTPUT_BIAS_R = "biases_tensor.txt"
+
+# ============== left =================
+
+TRAIN_FILE_L = 'train_data_pca_l.csv'
+TEST_FILE_L = 'test_data_pca_l.csv'
+
+OUTPUT_WEIGHTS_L = 'weights_tensor_l.txt'
+OUTPUT_BIAS_L = 'biases_tensor_l.txt'
+
+# =====================================
+
+INPUT_SIZE = 16
+LAYER_1_SIZE = 32
+OUTPUT_SIZE = 5
+
+EPOCH_COUNT = 40
 
 class FeatureDataset(Dataset):
     def __init__(self, file_name):
         file_out = pd.read_csv(file_name, header=0)
-        x = file_out.iloc[:, 3:34].values
-        y = file_out.iloc[:, 2].values
+        x = file_out.iloc[:, 1:17].values
+        y = file_out.iloc[:, 17].values
 
         self.X_train = torch.tensor(x, dtype=torch.float32)
         self.Y_train = torch.tensor(y)
@@ -39,9 +55,9 @@ class MLP(nn.Module):
     def __init__(self):
         super().__init__()
         self.layers = nn.Sequential(
-            nn.Linear(30, LAYER_1_SIZE),
-            nn.Sigmoid(),
-            nn.Linear(LAYER_1_SIZE, 5),
+            nn.Linear(INPUT_SIZE, LAYER_1_SIZE),
+            nn.LeakyReLU(),
+            nn.Linear(LAYER_1_SIZE, OUTPUT_SIZE),
             nn.Softmax(dim=1)
     )
 
@@ -51,7 +67,7 @@ class MLP(nn.Module):
   
 
 def save_weights_txt(param):
-    f = open("weights_tensor.txt", "w")
+    f = open(OUTPUT_WEIGHTS_R, "w")
     with torch.no_grad():
         param[0] = np.array(param[0]) # weights = input x layer 1
         for i in range(len(param[0][0])): #iterate through the cols = 61
@@ -75,7 +91,7 @@ def save_weights_txt(param):
         f.close()
 
 def save_biases_txt(param):
-    f = open("biases_tensor.txt", "w")
+    f = open(OUTPUT_BIAS_R, "w")
     with torch.no_grad():
         param[1] = np.array(param[1]) # bias = 1 x layer 1
         f.write('{')
@@ -100,9 +116,9 @@ def save_biases_txt(param):
 if __name__ == '__main__':
     torch.manual_seed(42)
 
-    test_set = FeatureDataset(TEST_FILE)
+    test_set = FeatureDataset(TEST_FILE_R)
 
-    training_set = FeatureDataset(TRAIN_FILE)
+    training_set = FeatureDataset(TRAIN_FILE_R)
 
     trainloader = torch.utils.data.DataLoader(training_set)
     testloader = torch.utils.data.DataLoader(test_set)
@@ -112,7 +128,7 @@ if __name__ == '__main__':
     loss_function = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(mlp.parameters(), lr=1e-4)
 
-    for epoch in range(0, 5):
+    for epoch in range(0, EPOCH_COUNT):
         current_loss = 0.0
         for i, data in enumerate(trainloader, 0):
             inputs, targets = data
@@ -148,19 +164,17 @@ if __name__ == '__main__':
         predictions_raw.append(yhat_raw)
         actuals.append(actual)
 
-    print('raw predictions: ', yhat_raw)
-    print('actual label: ', actual)
+
     predictions, actuals = np.vstack(predictions), np.vstack(actuals)
 
-    #print('predictions: ', predictions)
+    print('predictions: ', predictions_raw[0:5])
+    print('actuals: ', actuals[0:5])
 
     acc = balanced_accuracy_score(actuals, predictions)
-    print('acc: ', acc)
+    roc_auc = roc_auc_score(actuals, predictions)
+    print('acc: ', acc, 'roc auc: ', roc_auc)
 
     params = list(mlp.parameters())
-    #print('shape: ', len(params), ' layer 1 row: ', len(params[0]), ' layer 2 row: ', len(params[1]), ' layer 3 row: ', len(params[2]), ' layer 4 row: ', len(params[3]))
-    #print('shape: ', np.shape(weights))
-    #print('layer 1 shape: ', np.shape(params[0]), ' layer 2 shape: ', np.shape(params[1]), ' layer 3 shape: ', np.shape(params[2]), ' layer 4 shape: ', np.shape(params[3]))
 
     save_weights_txt(params)
     save_biases_txt(params)
