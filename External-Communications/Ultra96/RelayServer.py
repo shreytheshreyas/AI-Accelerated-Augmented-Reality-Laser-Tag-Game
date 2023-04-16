@@ -6,7 +6,7 @@ import time
 from Helper import Actions
 
 from HWAccel import HWAccel
-from Test import get_queue
+from Test import get_queue, print_logs
 
 COMPONENT_IDS = {
     "p1_gun": 0,
@@ -144,9 +144,6 @@ class RelayServer:
         if msg == "start":
             self.logs_queue.put(f"Start received from {component}")
             with self.connected.get_lock():
-                # if self.connected[COMPONENT_IDS[component]]:
-                # return True
-
                 self.logs_queue.put(f"Not connected yet")
                 self.connected[COMPONENT_IDS[component]] = True
                 player, sensor = component.split("_")
@@ -218,13 +215,8 @@ class RelayServer:
             self.logs_queue.put(f"Component {component} Ended")
 
     def handle_glove_conn(self, conn, in_queue, out_queue, player, component):
-        # i = 0
         try:
             while True:
-                # with self.connected.get_lock():
-                #     self.connected[0] = i
-                #     i = i + 1
-
                 msg = self.recv_msg(conn)
                 if not msg:
                     break
@@ -353,14 +345,32 @@ class RelayServer:
 if __name__ == "__main__":
     action_queue = mp.Queue()
     update_beetle_queue = mp.Queue()
+    action_console_queue = mp.Queue()
+    logs_queue = mp.Queue()
+    connected = mp.Array("i", [False] * 6)
 
-    relay_server = RelayServer("127.0.0.1", 8080, action_queue, update_beetle_queue)
+    relay_server = RelayServer(
+        "127.0.0.1",
+        8080,
+        action_queue,
+        update_beetle_queue,
+        connected,
+        action_console_queue,
+        logs_queue,
+    )
     relay_server_process = mp.Process(target=relay_server.run)
-
     action_process = mp.Process(target=get_queue, args=(action_queue,))
+    log_process = mp.Process(target=print_logs, args=(logs_queue,))
 
     try:
         relay_server_process.start()
+        action_process.start()
+        log_process.start()
+
         relay_server_process.join()
+        action_process.join()
+        log_process.join()
     except KeyboardInterrupt:
         relay_server_process.terminate()
+        action_process.terminate()
+        log_process.terminate()

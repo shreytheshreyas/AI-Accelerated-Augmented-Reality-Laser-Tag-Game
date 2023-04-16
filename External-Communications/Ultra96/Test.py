@@ -17,3 +17,8 @@ def put_queue(queue, data, period=4, delay=2):
     for d in data:
         queue.put(d)
         time.sleep(period)
+
+
+def print_logs(queue):
+    while True:
+        print(queue.get())

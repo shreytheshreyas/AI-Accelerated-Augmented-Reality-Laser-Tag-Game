@@ -1,13 +1,8 @@
-import logging
 import time
 
 from GameState import GameState
 from Helper import Actions
 
-TWO_PLAYER = True
-
-TURN_MAX_TIME = 5
-NEXT_TURN_TIME = 8
 
 SENSOR_MAPPING = {"gun": "bullets", "vest": "hp"}
 
@@ -61,49 +56,30 @@ class GameEngine:
         player_1.initialize_from_dict(update["p1"])
         player_2.initialize_from_dict(update["p2"])
 
-    def reset_timer(self):
-        self.turn_end_time = time.time() + TURN_MAX_TIME
-        self.turn_time_left = TURN_MAX_TIME
-
-    def set_delay(self):
-        self.next_turn_time = time.time() + NEXT_TURN_TIME
-
-    def is_before_delay(self):
-        return time.time() <= self.next_turn_time
-
     def reset_turn(self):
         self.clear_action_queue()
+
         self.complete = {"p1": False, "p2": False}
 
         self.signals = {
             "p1": {
                 "action": Actions.no,
                 "opp_hit": False,
-                "opp_blasted": False,
             },
             "p2": {
                 "action": Actions.no,
                 "opp_hit": False,
-                "opp_blasted": False,
             },
         }
-
-    def check_turn(self, player):
-        if self.signals[player]["action"] in Actions.all:
-            self.complete[player] = True
 
     def get_opp(self, player):
         return "p1" if player == "p2" else "p2"
 
     def is_complete(self):
-        if TWO_PLAYER:
-            if self.complete["p1"] and self.complete["p2"]:
-                self.logs_queue.put("Both complete")
-                return True
-            # self.logs_queue.put("Not both complete")
-            return False
-
-        return self.complete["p1"] or self.complete["p2"]
+        if self.complete["p1"] and self.complete["p2"]:
+            self.logs_queue.put("Both complete")
+            return True
+        return False
 
     def is_logged_out(self):
         if (
@@ -118,17 +94,10 @@ class GameEngine:
         game_state = self.game_state.get_dict()
         self.eval_req_console_queue.put(game_state)
         self.eval_resp_console_queue.put(game_state)
-        # self.reset_turn()
         game_start = True
 
         while game_start:
-            if self.is_before_delay():
-                while self.is_before_delay():
-                    pass
-                self.reset_turn()
-
             if not self.action_queue.empty():
-                # self.logs_queue.put("Getting from action queue")
                 player, action = self.action_queue.get()
                 opp = self.get_opp(player)
 
@@ -148,20 +117,11 @@ class GameEngine:
 
                 if action in Actions.all:
                     self.signals[player]["action"] = action
-                    # if action == "shoot":
-                    #     self.reset_timer()
-                    # if self.signals[opp]["action"] == Actions.no:
-                    #     self.reset_timer()
+                    self.complete[player] = True
                 elif action == Actions.hit:
                     if not self.signals[opp]["opp_hit"]:
                         self.signals[opp]["opp_hit"] = True
-                        # if self.signals[opp]["action"] == Actions.no:
-                        #     self.reset_timer()
 
-                self.check_turn("p1")
-                self.check_turn("p2")
-
-            # if self.is_complete() and self.after_delay():
             if self.is_complete():
                 with self.connected_to_eval.get_lock():
                     if not self.connected_to_eval.value:
@@ -169,10 +129,6 @@ class GameEngine:
 
                 action_p1 = self.signals["p1"]["action"]
                 action_p2 = self.signals["p2"]["action"]
-
-                if action_p1 == Actions.no and action_p2 == Actions.no:
-                    self.reset_turn()
-                    continue
 
                 opp_hit_p1 = self.signals["p1"]["opp_hit"]
                 opp_hit_p2 = self.signals["p2"]["opp_hit"]
@@ -208,7 +164,6 @@ class GameEngine:
                 self.vis_queue.put(updated_game_state)
 
                 self.reset_turn()
-                self.set_delay()
         self.logs_queue.put("End of Game Engine Run")
 
     def run(self):

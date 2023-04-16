@@ -1,14 +1,14 @@
 On local
 Add the following to .ssh/config
 ```bash
-Host SOC
+Host soc
     HostName stu.comp.nus.edu.sg
     User kaijiel
 
-Host Ultra96
+Host ult
     HostName 192.168.95.236
     User xilinx
-    ProxyJump SOC
+    ProxyJump soc
     ForwardAgent yes
     IdentityFile ~/.ssh/id_rsa_soc
 ```
@@ -21,13 +21,13 @@ ssh-copy-id kaijiel@stu.comp.nus.edu.sg
 
 SSH into SOC server 
 ```bash
-ssh SOCJ
+ssh soc
 ```
 
 On server do
 ```bash
 ssh-keygen -t rsa
-ssh-copy-id xilinx@192.168.95.236
+ssh-copy-id xilinx@192.168.95.250
 ```
 
 Back on local do:
@@ -37,5 +37,5 @@ scp SOC:.ssh/id_rsa ~/.ssh/id_rsa_soc
 
 After this, you should be able to ssh directly from local to Ultra96 by doing
 ```bash
-ssh Ultra96
+ssh ult
 ```
