@@ -30,7 +30,7 @@ Logout: Gesture to end game and logout.
 
 ### System Architecture Diagram Illustration
 {Include System Architecture Diagram}
-
+This is a test
 ### Hardware Components Placement
 {Drawing of harware components}
 {Grid Picture of Gun, Vest}
