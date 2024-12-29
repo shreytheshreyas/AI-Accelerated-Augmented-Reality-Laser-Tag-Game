@@ -226,3 +226,96 @@ The system uses the following libraries in C++:
 #### Issues and Solutions
 A key issue encountered during integration was the vest's inability to simultaneously receive data from both Serial (bluetooth) and IR Receiver. This was resolved by reinitializing the IR Receiver after bluetooth data reception using `IrReceiver.begin(IR_RCV_PIN)`.
 
+## Hardware AI Component Summary
+
+The hardware AI component represents a sophisticated sub-system designed to process sensor data and recognize player actions in real-time. The system comprises several interconnected stages that work together to transform raw sensor data into meaningful gameplay actions.
+
+### Synthesis and Simulation Setup
+
+The implementation process utilizes Vivado HLS to transform C++ code into RTL code through these essential steps:
+
+1. Building the neural network in C++
+2. Verifying the code through the C-simulation in Vivado HLS
+3. Executing C-synthesis
+4. Verifying the kernel through RTL simulation
+5. Reviewing synthesis and co-simulation reports
+
+![Final block design showing the neural network IP and peripheral IPs with AXI DMA connections](./Image_Assets/ip_block_diagram_axi_dma.png)
+*Final block design showing the neural network IP and peripheral IPs with AXI DMA connections*
+
+### Data Collection and Processing
+
+The system begins with data collection from an MPU6050 sensor mounted on the player's glove, sampling at 20Hz to capture six fundamental measurements: three-axis acceleration and three-axis gyroscopic data. The move detection algorithm processes this continuous data stream using a sliding window approach to identify meaningful actions:
+
+- Window Size: 8 data points covering 0.4 seconds
+- Energy Calculation: Computes total movement energy within each window
+- Movement Detection: Identifies significant energy changes between consecutive windows
+- Action Capture: Records 30 subsequent data points (1.5 seconds) from the data stream when movement is detected
+
+![Energy Formula](./Image_Assets/energy_formula.png)
+*Energy formula*
+
+### Feature Engineering
+
+Once movements are detected, the system transforms raw sensor data into meaningful features through a sophisticated processing pipeline:
+
+| Raw Sensor Features | Statistical Features (calculated for each raw feature) |
+|--------------------|----------------------------------------------------|
+| Acceleration x-axis | Mean |
+| Acceleration y-axis | Standard deviation |
+| Acceleration z-axis | Root mean square |
+| Gyro x-axis | Kurtosis |
+| Gyro y-axis | Skewness |
+| Gyro z-axis | Interquartile range |
+|                    | Median absolute deviation |
+|                    | Frequency domain mean |
+|                    | Frequency domain range |
+|                    | Frequency domain skewness |
+
+The system initially generates 60 features (6 measurements × 10 statistical features), which are then reduced to 16 features through PCA, maintaining 95% of the data variance while improving computational efficiency.
+
+### Neural Network Architecture
+
+The system employs a Multi-layer Perceptron (MLP) architecture, chosen for its optimal balance of performance and implementation complexity:
+
+- Input layer: 16 nodes (receiving the processed features)
+- Hidden layer: 32 nodes (determined through hyperparameter tuning)
+- Output layer: 5 nodes (representing idle, shield, grenade, reload, and logout actions)
+- Activation functions: Leaky ReLU for hidden layer and Softmax for output layer
+
+![MLP Design](./Image_Assets/mlp_design.png)
+*MLP Design*
+
+### Hardware Accelerator Implementation Results
+
+The system achieves impressive performance metrics across several key areas:
+
+#### Timing and Latency
+- Timing: 4.056ns
+- Significantly reduced latency through function pipelining
+![Timing and Latency Metrics](./Image_Assets/timing_and_latency.png)
+*Timing and Latency Metrics*
+
+#### Power Consumption
+- Final design power: 2.172W
+![Power Consumption Metrics](./Image_Assets/hw_ai_power_consumption.png)
+*Power Consumption*
+
+
+#### Resource Utilization
+- Hardware resource utilization remains efficient at <25% for most components
+![Resource Utilization Estimates](./Image_Assets/hw_resource_utilization.png)
+*Resource Utilization Metrics*
+
+### Key Improvements
+
+Throughout development, several crucial enhancements optimized system performance:
+
+1. Correction of AXI DMA buffer size to handle 45 features
+2. Implementation of sophisticated feature selection and dimensionality reduction
+3. Addition of balanced accuracy metrics for handling imbalanced datasets
+4. Optimization of pipeline latency through function pipelining
+5. Seamless integration with the game engine through queue-based data handling
+6. Fine-tuning of move detection parameters for optimal gesture recognition
+
+The hardware AI component successfully combines efficient data collection, sophisticated feature engineering, and neural network classification to provide accurate, real-time action recognition. The careful balance between all system components ensures responsive and accurate gameplay while maintaining efficient resource utilization and power consumption. The shift from CNN to MLP, coupled with the sophisticated data processing pipeline, has created a robust system capable of meeting the demanding requirements of real-time gesture recognition in the laser tag game environment.
