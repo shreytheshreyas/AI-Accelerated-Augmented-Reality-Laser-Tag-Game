@@ -25,7 +25,9 @@ Logout: Gesture to end game and logout.
 | Player | know when I hit my opponent | I can confirm my aim |
 | Player | throw a grenade in my line of sight | I can inflict grenade damage |
 | Player | activate my shield | I can protect myself from potential attacks|
- 
+
+---
+
 ## System Architecture 
 The system implements a sophisticated laser tag game utilizing an Ultra96 board as its central processing unit. Multiple hardware components connect to this board to enable gameplay features including motion detection, shot registration, and real-time state management.
 
@@ -33,13 +35,13 @@ The system implements a sophisticated laser tag game utilizing an Ultra96 board 
 
 #### Illustration of Overall Architecture
 ![System Architecture Overview Diagram](./Image_Assets/system_architecture.png)
-*Figure 2.1.1: Complete system architecture showing interconnections between hardware components and the Ultra96 board*
+*Figure: Complete system architecture showing interconnections between hardware components and the Ultra96 board*
 
 #### Wearable Components
 ##### Sensor Placement in Wearable Components
 The system features three primary wearable components that players use during gameplay. The following Diagram showcases the placement of the hardware sensors on the respective components.
 ![Sensor Placement in Wearable Components](./Image_Assets/sensor_placement.png)
-*Figure 2.2.3: The above figure showcases the placement of the sensors we utilized on the players wearables*
+*Figure: The above figure showcases the placement of the sensors we utilized on the players wearables*
 
 1. **Gun Assembly**
    - Equipped with IR transmitters
@@ -47,7 +49,7 @@ The system features three primary wearable components that players use during ga
    - Provides real-time ammunition feedback
 
 ![Gun Component Layout](./Image_Assets/gun_layout.png)
-*Figure 2.2.3: Detailed gun assembly showing IR transmitter placement and display integration*
+*Figure: Detailed gun assembly showing IR transmitter placement and display integration*
 
 2. **Tactical Vest**
    - Features IR receivers for shot detection
@@ -55,13 +57,14 @@ The system features three primary wearable components that players use during ga
    - Strategic sensor placement for optimal detection
 
 ![Vest Component Layout](./Image_Assets/vest_layout.png)
-*Figure 2.2.2: Vest design showing IR receiver placement and display mounting points*
+*Figure: Vest design showing IR receiver placement and display mounting points*
 
 3. **Smart Glove**
    - Integrated motion sensors
    - Enables gesture detection
    - Provides real-time movement data
 ![Action Glove Component Layout](./Image_Assets/action_glove_layout.png)
+*Figure: Action glove design showing MPU and bluno beetle microcontroller placement*
 
 ### Ultra96 Process Architecture
 
@@ -137,6 +140,8 @@ The system utilizes multiple communication mechanisms:
 
 This architecture ensures robust gameplay management while maintaining clear separation of concerns between different system components.
 
+---
+
 ## Hardware Sensors Design and Implementaion
 ### List of Technical Components
 Here are the main components used in the system:
@@ -198,13 +203,13 @@ The system uses the following libraries in C++:
 
 ### Circuit Schematics
 ![Connection Between Bluno Beetle and MPU Sensor](./Image_Assets/conn_beetle_mpu.png)
-*Circuit connections between Bluno Beetle microcontroller and MPU Sensor*
+*Figure: Circuit connections between Bluno Beetle microcontroller and MPU Sensor*
 
 ![Connection Between Bluno Beetle, IR-transmitter, Piezo Buzzer, and Push Button](./Image_Assets/conn_beetle_trans_buzzer_button.png)
-*Circuit connections between Bluno Beetle microcontroller, IR Transmitter Piezo Buzzer, and Push Button*
+*Figure: Circuit connections between Bluno Beetle microcontroller, IR Transmitter Piezo Buzzer, and Push Button*
 
 ![Connection Between Bluno Beetle, IR Receiver, and LED Strip](./Image_Assets/conn_beetle_receiver_led_strip.png)
-*Circuit connections between Bluno Beetle microcontroller, IR Receiver and LED Strip*
+*Figure: Circuit connections between Bluno Beetle microcontroller, IR Receiver and LED Strip*
 
 ### Implementation Details
 
@@ -226,7 +231,9 @@ The system uses the following libraries in C++:
 #### Issues and Solutions
 A key issue encountered during integration was the vest's inability to simultaneously receive data from both Serial (bluetooth) and IR Receiver. This was resolved by reinitializing the IR Receiver after bluetooth data reception using `IrReceiver.begin(IR_RCV_PIN)`.
 
-## Hardware AI Component Summary
+---
+
+## Hardware AI Design and Implementation
 
 The hardware AI component represents a sophisticated sub-system designed to process sensor data and recognize player actions in real-time. The system comprises several interconnected stages that work together to transform raw sensor data into meaningful gameplay actions.
 
@@ -241,7 +248,7 @@ The implementation process utilizes Vivado HLS to transform C++ code into RTL co
 5. Reviewing synthesis and co-simulation reports
 
 ![Final block design showing the neural network IP and peripheral IPs with AXI DMA connections](./Image_Assets/ip_block_diagram_axi_dma.png)
-*Final block design showing the neural network IP and peripheral IPs with AXI DMA connections*
+*Figure: Final block design showing the neural network IP and peripheral IPs with AXI DMA connections*
 
 ### Data Collection and Processing
 
@@ -253,7 +260,7 @@ The system begins with data collection from an MPU6050 sensor mounted on the pla
 - Action Capture: Records 30 subsequent data points (1.5 seconds) from the data stream when movement is detected
 
 ![Energy Formula](./Image_Assets/energy_formula.png)
-*Energy formula*
+*Figure: Energy formula*
 
 ### Feature Engineering
 
@@ -284,7 +291,7 @@ The system employs a Multi-layer Perceptron (MLP) architecture, chosen for its o
 - Activation functions: Leaky ReLU for hidden layer and Softmax for output layer
 
 ![MLP Design](./Image_Assets/mlp_design.png)
-*MLP Design*
+*Figure: MLP Design*
 
 ### Hardware Accelerator Implementation Results
 
@@ -294,18 +301,18 @@ The system achieves impressive performance metrics across several key areas:
 - Timing: 4.056ns
 - Significantly reduced latency through function pipelining
 ![Timing and Latency Metrics](./Image_Assets/timing_and_latency.png)
-*Timing and Latency Metrics*
+*Figure: Timing and Latency Metrics*
 
 #### Power Consumption
 - Final design power: 2.172W
 ![Power Consumption Metrics](./Image_Assets/hw_ai_power_consumption.png)
-*Power Consumption*
+*Figure: Power Consumption*
 
 
 #### Resource Utilization
 - Hardware resource utilization remains efficient at <25% for most components
 ![Resource Utilization Estimates](./Image_Assets/hw_resource_utilization.png)
-*Resource Utilization Metrics*
+*Figure: Resource Utilization Metrics*
 
 ### Key Improvements
 
@@ -319,3 +326,7 @@ Throughout development, several crucial enhancements optimized system performanc
 6. Fine-tuning of move detection parameters for optimal gesture recognition
 
 The hardware AI component successfully combines efficient data collection, sophisticated feature engineering, and neural network classification to provide accurate, real-time action recognition. The careful balance between all system components ensures responsive and accurate gameplay while maintaining efficient resource utilization and power consumption. The shift from CNN to MLP, coupled with the sophisticated data processing pipeline, has created a robust system capable of meeting the demanding requirements of real-time gesture recognition in the laser tag game environment.
+
+---
+
+
