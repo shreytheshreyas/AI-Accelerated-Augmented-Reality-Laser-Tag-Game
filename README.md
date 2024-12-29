@@ -25,31 +25,114 @@ Logout: Gesture to end game and logout.
 | Player | know when I hit my opponent | I can confirm my aim |
 | Player | throw a grenade in my line of sight | I can inflict grenade damage |
 | Player | activate my shield | I can protect myself from potential attacks|
-
+ 
 ## System Architecture 
+The system implements a sophisticated laser tag game utilizing an Ultra96 board as its central processing unit. Multiple hardware components connect to this board to enable gameplay features including motion detection, shot registration, and real-time state management.
 
-### System Architecture Diagram Illustration
-{Include System Architecture Diagram}
-This is a test
-### Hardware Components Placement
-{Drawing of harware components}
-{Grid Picture of Gun, Vest}
+### Core Hardware Components
 
-### Main Processes
-This system employs a multi-process architecture where parent and child processes communicate securely through multiprocessing queues and arrays. Below, we detail the core functionality of each parent process and its associated child processes.
+#### Illustration of Overall Architecture
+![System Architecture Overview Diagram](./Image_Assets/system_architecture.png)
+*Figure 2.1.1: Complete system architecture showing interconnections between hardware components and the Ultra96 board*
 
-1. **Relay Server Parent Process**
-   - **Child Process 1**: Update Beetles
-     - Tracks socket connections for players' guns and vests
-     - Sends bullet and health-points data via socket connection
+#### Wearable Components
+##### Sensor Placement in Wearable Components
+The system features three primary wearable components that players use during gameplay. The following Diagram showcases the placement of the hardware sensors on the respective components.
+![Sensor Placement in Wearable Components](./Image_Assets/sensor_placement.png)
+*Figure 2.2.3: The above figure showcases the placement of the sensors we utilized on the players wearables*
+
+1. **Gun Assembly**
+   - Equipped with IR transmitters
+   - Integrated bullet count display
+   - Provides real-time ammunition feedback
+
+![Gun Component Layout](./Image_Assets/gun_layout.png)
+*Figure 2.2.3: Detailed gun assembly showing IR transmitter placement and display integration*
+
+2. **Tactical Vest**
+   - Features IR receivers for shot detection
+   - Includes HP display for health monitoring
+   - Strategic sensor placement for optimal detection
+
+![Vest Component Layout](./Image_Assets/vest_layout.png)
+*Figure 2.2.2: Vest design showing IR receiver placement and display mounting points*
+
+3. **Smart Glove**
+   - Integrated motion sensors
+   - Enables gesture detection
+   - Provides real-time movement data
+![Action Glove Component Layout](./Image_Assets/action_glove_layout.png)
+
+### Ultra96 Process Architecture
+
+The system implements a sophisticated multi-process architecture on the Ultra96 board, utilizing multiprocessing queues and arrays for robust inter-process communication.
+
+#### Process 1: Relay Server
+This primary process manages all hardware component communications through several child processes:
+
+1. **Update Beetles (Child Process 1)**
+   - Manages socket connections for player equipment
+   - Handles real-time updates of bullet counts and HP
+   - Ensures synchronization between components
+
+2. **Component Handlers (Child Processes 2-7)**
+   Each handler process manages a specific component type:
+   - **Gun Handler**: 
+     - Processes shooting actions
+     - Updates ammunition counts
+     - Manages trigger events
    
-   - **Child Processes 2-7**: Handle Component Connections
-     - Instantiated when a Relay Node connection is established and the initial message confirms the component type.
-     - Processes component-specific messages:
-       - Gun: Adds player and "shoot" to action_queue
-       - Vest: Adds player and "hit" to action_queue
-       - Glove: Sends 20Hz data points to HW Accel Process
+   - **Vest Handler**:
+     - Detects and processes hit registration
+     - Updates player health status
+     - Manages damage calculations
+   
+   - **Glove Handler**:
+     - Processes motion data at 20Hz
+     - Forwards data to HW Accelerator
+     - Manages gesture recognition pipeline
 
-   - **Child Processes 8-9**: HW Accelerator
-     - Uploads bitstream using pynq library
-     - Manages DMA buffers for each player
+3. **HW Accelerator (Child Processes 8-9)**
+   - Dedicated process per player
+   - Handles gesture recognition acceleration
+   - Manages hardware-level motion processing
+
+#### Process 2: Game Engine
+The central game logic coordinator responsible for:
+- Maintaining current game state
+- Processing player actions from action_queue
+- Updating game signals based on events
+- Communicating with evaluation server
+- Managing hardware component state updates
+
+#### Process 3: Eval Client
+Handles all evaluation server communications:
+- Implements AES encryption for data security
+- Manages game state verification
+- Processes server responses
+- Updates game engine with verified states
+
+#### Process 4: MQTT Client
+Manages real-time communication through:
+- HiveMQ broker connection management
+- Subscription to "LaserTag/OppInFrame" topic
+- Game state publishing to "LaserTag/GameState"
+- Real-time visualizer updates
+
+#### Process 5: Console Interface
+Provides system monitoring through:
+- Real-time component status display
+- Action history tracking
+- Game state visualization
+- System log management
+
+### Inter-Process Communication
+The system utilizes multiple communication mechanisms:
+- Multiprocessing queues for asynchronous data transfer
+- Shared arrays for real-time state management
+- Socket connections for external communications
+- MQTT for visualization updates
+![Console Interface Diagram](./Image_Assets/console_interface.png)
+*Figure: Inter-process communication showcased in the console interface*
+
+This architecture ensures robust gameplay management while maintaining clear separation of concerns between different system components.
