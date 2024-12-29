@@ -136,3 +136,93 @@ The system utilizes multiple communication mechanisms:
 *Figure: Inter-process communication showcased in the console interface*
 
 This architecture ensures robust gameplay management while maintaining clear separation of concerns between different system components.
+
+## Hardware Sensors Design and Implementaion
+### List of Technical Components
+Here are the main components used in the system:
+
+| Component | Use |
+|-----------|-----|
+| DFR0339 Bluno Beetle | Receives sensor data and transmits to relays |
+| MPU6050 (GY-521) | source of Linear and Gyroscopic data for gestures associated with Shield, Grenade, Reload, and Logout Move; Placed on player's action glove |
+| IR Transmitter and Receiver | Transmitter on gun for laser shots simulation; Receiver on vests for shot detection |
+| Piezo Buzzer | Provides audio feedback for both gun and vest |
+| TM1637 4 Digit 7-Segment | Display on vest showing opponent's health |
+| Trigger Button | On gun to enable IR signal emission for shots |
+| Apparels | Vest, Glove, and Gun |
+
+### Pin Configurations
+
+#### Bluno Beetle to MPU Connection
+| Pin on DFR0339 Bluno Beetle | Pin on MPU-6050 |
+|-----------------------------|--------------------|
+| 5V | VCC |
+| GND | GND |
+| A5 | SCL |
+| A4 | SDA |
+
+#### Bluno Beetle, IR Transmitter, Switch, Piezo Buzzer Connection
+| Pin on DFR0339 Bluno Beetle | Pin on IR Transmitter | Pin on Switch | Pin on Piezo Buzzer |
+|-----------------------------|----------------------|---------------|-------------------|
+| 5V | VCC | - | - |
+| GND | GND | GND | GND |
+| D2 | - | VCC | - |
+| D3 (PWM) | OUT | - | - |
+| D5 (PWM) | - | - | VCC |
+
+#### Bluno Beetle, IR Receiver, TM1637, Piezo Buzzer Connection
+| Pin on DFR0339 Bluno Beetle | Pin on IR Receiver | Pin on TM1637 | Pin on Piezo Buzzer |
+|-----------------------------|-------------------|---------------|-------------------|
+| 5V | VCC | VCC | - |
+| GND | GND | GND | GND |
+| D2 | - | DIO | - |
+| D3 (PWM) | OUT | - | - |
+| D4 (PWM) | - | CLK | - |
+| D5 (PWM) | - | - | OUT |
+
+### Operating Voltages
+| Component | Operating Voltage |
+|-----------|------------------|
+| DFR0339 Bluno Beetle | 5V |
+| MPU-6050 | 2.375V - 3.46V |
+| IR Transmitter | 1.2V |
+| IR Receiver | 2.7V - 5.0V |
+| Piezo Buzzer | 1.5V - 2.4V |
+| TM1637 4 Digit 7 Segment Display | 3.3V - 5V |
+
+### Libraries and Implementation
+The system uses the following libraries in C++:
+1. Glove: `<Wire.h>` and `<MPU6050.h>` for I2C communication
+2. Gun: `<IRremote.hpp>` for IR signal transmission
+3. Vest: `<IRremote.h>` and `<TM1637Display.h>` for IR reception and display
+
+### Circuit Schematics
+![Connection Between Bluno Beetle and MPU Sensor](./Image_Assets/conn_beetle_mpu.png)
+*Circuit connections between Bluno Beetle microcontroller and MPU Sensor*
+
+![Connection Between Bluno Beetle, IR-transmitter, Piezo Buzzer, and Push Button](./Image_Assets/conn_beetle_trans_buzzer_button.png)
+*Circuit connections between Bluno Beetle microcontroller, IR Transmitter Piezo Buzzer, and Push Button*
+
+![Connection Between Bluno Beetle, IR Receiver, and LED Strip](./Image_Assets/conn_beetle_receiver_led_strip.png)
+*Circuit connections between Bluno Beetle microcontroller, IR Receiver and LED Strip*
+
+### Implementation Details
+
+#### Glove Implementation
+- Uses I2C communication through Wire.h
+- Extracts X, Y, Z axes data from MPU6050 for both accelerometer and gyroscope
+- Combines two registers per axis to get correct values
+
+#### Gun Implementation
+- Emits unique IR signals per player using `IRSender.sendNEC(address,command,repeats)`
+- Piezo buzzer provides audio feedback for successful shots and empty ammo
+
+#### Vest Implementation
+- Constantly receives and decodes IR signals using `IrReceiver.decode()`
+- Validates signals based on player-specific commands
+- Updates health display on TM1637
+- Provides audio feedback for successful hit registration
+
+#### Issues and Solutions
+A key issue encountered during integration was the vest's inability to simultaneously receive data from both Serial (bluetooth) and IR Receiver. This was resolved by reinitializing the IR Receiver after bluetooth data reception using `IrReceiver.begin(IR_RCV_PIN)`.
+
