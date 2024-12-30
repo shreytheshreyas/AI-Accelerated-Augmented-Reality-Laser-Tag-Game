@@ -376,6 +376,7 @@ Each player has a dedicated relay node to avoid pipeline congestion. The threads
 | Checksum | uint8_t | 1 byte | Error detection code |
 
 ![Packet Structure](./Image_Assets/packet_structure.png)
+
 *Packet Structure*
 
 ### Handshaking Mechanism
@@ -397,6 +398,7 @@ Each player has a dedicated relay node to avoid pipeline congestion. The threads
 
 #### Timing Diagram for Relay Node-Beetle Communication
 ![Timing Digram for Relay Node- Beetle Data Communication](./Image_Assets/ble_timing_diagram_data_trans_relay_and_beetle.png)
+
 *UML Diagram for Relay Node Data Transmission Classes*
 
 The data transmission follows ARQ (Automatic Repeat Request) protocol:
