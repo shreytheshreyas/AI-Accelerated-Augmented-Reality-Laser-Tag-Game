@@ -70,7 +70,7 @@ The system features three primary wearable components that players use during ga
 
 The system implements a sophisticated multi-process architecture on the Ultra96 board, utilizing multiprocessing queues and arrays for robust inter-process communication.
 
-#### Process 1: Relay Server
+#### Process 1: Relay Node
 This primary process manages all hardware component communications through several child processes:
 
 1. **Update Beetles (Child Process 1)**
@@ -142,7 +142,7 @@ This architecture ensures robust gameplay management while maintaining clear sep
 
 ---
 
-## Hardware Sensors Design and Implementaion
+## Embedded Hardware and Sensor Network Design and Implementaion
 ### List of Technical Components
 Here are the main components used in the system:
 
@@ -233,7 +233,7 @@ A key issue encountered during integration was the vest's inability to simultane
 
 ---
 
-## Hardware AI Design and Implementation
+## Hardware Accelerated Neural Motion Intelligence Engine Design and Implementation
 
 The hardware AI component represents a sophisticated sub-system designed to process sensor data and recognize player actions in real-time. The system comprises several interconnected stages that work together to transform raw sensor data into meaningful gameplay actions.
 
@@ -329,4 +329,176 @@ The hardware AI component successfully combines efficient data collection, sophi
 
 ---
 
+## Bluetooth-Low-Energy Communicaion Pipeline Architecture Design and Implementation 
+
+### Thread Management (Section 5.1)
+Each player has a dedicated relay node to avoid pipeline congestion. The threads are distributed as follows:
+
+- Thread-0 and Thread-3: Managing gun Bluno Beetle data for shot detection during gameplay
+- Thread-1 and Thread-4: Managing vest Bluno Beetle data for damage detection during gameplay
+- Thread-2 and Thread-5: Managing glove Bluno Beetle data for IMU data from action glove for action classification during gameplay
+
+### BLE Interface (Section 5.2)
+
+#### MAC Address Management
+- MAC addresses of beetles are hardcoded into relay nodes rather than using BLE's advertising capability
+- Enables direct connection initiation when beetles are within range
+- Active monitoring of connection status with automatic reconnection procedures
+- Eliminates need for device discovery, improving connection speed, reliability, and most importantly the incorporating the Real-Time nature of the system
+
+#### Connection Protocol Implementation
+- Uses connection-oriented protocols requiring reliable connection establishment
+- Implements handshake mechanism for connection verification
+- Requires successful connection verification before any data transmission
+
+### Protocol Design Implementation 
+
+#### Packet Types
+
+| Packet Type | Identifier | Description |
+|-------------|------------|-------------|
+| Synchronize | S | Used for handshake connection establishment between the a beetle and the relay node|
+| Reset | R | Sent from relay node to beetle to signal beetle to reset to initial state after disconnection |
+| Gun Data | G | Sent from beetle to relay node to indicate shot has been fired from a players gun|
+| Vest Data | V | Sent from beetle to relay node to indicate player has been shot |
+| IMU Data | I | Notifies relay node of IMU data sent from a player's action glove |
+| Acknowledgement | A | Acknowledgement packet sent during the handshake mechanism between a beetle and the relay node|
+| Data-Acknowledgement | D | Packet sent from relay node to beetle to confirm the data for transmitted by the beetle was received successfully |
+
+### Packet Format
+- Maximum Transmission Unit: 27 bytes (20 bytes used for transmission)
+
+| Packet Component | Data-Type | Memory Size | Description |
+|-----------|-----------|------|-------------|
+| Sequence Number | uint8_t | 1 byte | Packet sequence identifier |
+| Packet Type | char | 1 byte | Type of packet being transmitted |
+| Payload | uint8_t | 17 bytes | Main data content |
+| Checksum | uint8_t | 1 byte | Error detection code |
+
+![Packet Structure](./Image_Assets/packet_structure.png)
+*Packet Structure*
+
+### Handshaking Mechanism
+- The following Timing Diagram illustrates the sequence of communication between relay node and beetle during connection establishment. It also Demonstrates the temporal flow of the three-way handshake protocol.
+![Timing Diagram for Three-way-handshake](./Image_Assets/ble_timing_diagram_handshake.png)
+*Timing Diagram for Three-way-handshake protocol*
+
+#### State Management and State Transitions During Handshake Mechanism
+- The following Finite State Machine Diagram showcases the state transitions of the relay node during the handshake process. It illustrates the main states the relay node enters into and what conditions initiate a state transition. The states of the relay node include: INIT, WAIT_FOR_ACK, SEND_ACK, and CONNECTED. 
+![Finite-State-Machine-Diagram for relay node during Handshaking](./Image_Assets/fsm_relay_node_handshake.png)
+*Finite-State-Machine for relay node during Three-wake-handshake protocol*
+
+- The following Finite State Machine Diagram showcases the state transitions of the beetle microcontroller during the handshake process. It illustrates the main states the microcontrollet enters into and what conditions initiate a state transition. The states of the relay node include: INIT, RECEIVED_SYNC, WAIT_FOR_ACK, and CONNECTED. 
+![Finite-State-Machine-Diagram for beetle controller during Handshaking](./Image_Assets/fsm_beetle_handshake.png)
+*Finite-State-Machine for beetle microcontroller during Three-wake-handshake protocol*
+
+
+### Data Transmission
+
+#### Timing Diagram for Relay Node-Beetle Communication
+![Timing Digram for Relay Node- Beetle Data Communication](./Image_Assets/ble_timing_diagram_data_trans_relay_and_beetle.png)
+*UML Diagram for Relay Node Data Transmission Classes*
+
+The data transmission follows ARQ (Automatic Repeat Request) protocol:
+1. **Initial Transmission**
+  - Beetle sends data packet with sequence number and checksum
+  - Relay node verifies packet integrity
+
+2. **Acknowledgment Phase**
+  - If packet valid: Relay node sends Data-Acknowledgement (D)
+  - If packet invalid/lost: Beetle timeout triggers retransmission
+
+3. **Data Processing**
+  - After acknowledgment, relay node processes data
+  - Data forwarded to next stage in pipeline
+  - Beetle prepares next data packet if available
+
+#### Relay Node Class Structure
+![UML Diagram for Relay Node Data Transmission Classes](./Image_Assets/uml_ble_relay_node.png)
+*UML Diagram for Relay Node Data Transmission Classes*
+
+- Core Classes:
+  1. **BlunoDevice (Base Class)**
+     - Handles data transmission via `transmission_protocol()`
+     - Manages connections through `handshake_mechanism()`
+     - Maintains connection flags and states
+  2. **BluetoothInterfaceHandler**
+     - Parses received data packets via `handleNotifications()`
+     - Forwards data to Ultra-96
+     - Controls acknowledgement flags
+
+Data Flow:
+- Upward: Beetle → Relay Node Parent Process and Respective Child Processes → Hardware AI
+- Downward: Hardware AI → Relay Node Parent Process and Respective Child Processes → Beetle
+
+#### Component Protocol Classes
+![UML Diagram for Data Transimssion Classes for different protocols associated with the Gun, Vest, and Action Glove](./Image_Assets/uml_ble_hardware.png)
+*UML Diagram for Data Transimssion Classes for different protocols associated with the Gun, Vest, and Action Glove*
+
+##### Gun Protocol
+- Manages shot detection and transmission
+- Handles trigger events and validation
+- Synchronizes bullet count
+
+##### Vest Protocol
+- Handles hit detection and health points
+- Manages damage calculation
+- Updates seven-segment display
+
+##### Action Glove with IMU Protocol
+- Continuous sampling at 20Hz
+- Handles float-to-int scaling
+- Processes acceleration and gyroscope data
+
+##### Common Protocol Features
+1. **Data Processing**
+   - Checksum calculation
+   - Encoding/decoding methods
+   - Sequence number management
+
+2. **State Management**
+   - Individual state machines
+   - Event-based transitions
+   - Error handling and recovery
+
+3. **Communication**
+   - Consistent packet formatting
+   - Acknowledgment system
+   - Error handling and retries
+
+
+#### State Management and State Transitions during Data-Transmission
+- The following diagram depicts the state machine for the `transition_protocol()` method of the `BlunoDevice` class of the Relay-Node codebase. It illustrates how data packets are processed and acknowledged. Additionally it showcases the upstream flow of data in the communication pipeline.
+![Finite-State-Machine for Upstream Data Transmission](./Image_Assets/ble_fsm_upstream_data_transmission.png)
+*Finite-State-Machine for Upstream Data Transmission*
+
+
+- The following diagram depicts the state machine for the downstream flow data flowing from relay node to beetle. Illustrates how the system game state updates are processed and sent to each respective players microcontrollers and their assocaited sensors.
+![Finite-State-Machine for Downstream Data Transmission](./Image_Assets/ble_fsm_downstream_data_transmission.png)
+*Finite-State-Machine for Downstream Data Transmission*
+
+### Floating Point to Integer Scaling
+1. Linear-Acceleration Scaling:
+   - Factor: 2^14 - 2 = 16382
+   - Range: -2 to +2 scaled to -32,768 to +32,767
+
+2. Gyroscopic-Acceleration Scaling:
+   - Factor: 2^7 = 128
+   - Range: -255 to +255 scaled to -32,768 to +32,767
+
+### Packet Fragmentation and Data Rate Management
+- Each beetle thread has dedicated receiving buffer
+- 20-byte minimum read requirement to prevent incomplete packet processing
+- Handles high data rates through buffer management
+
+### Disconnection Management and Reconnection
+- Clears all conditional flags upon disconnection
+- Attempts reconnection through handshake mechanism
+- Repeats until successful reconnection
+
+### Integration Issues
+Required startup sequence:
+1. Start Ultra96.py and Eval.py code
+2. Start player relay nodes
+3. Power on beetles
 
