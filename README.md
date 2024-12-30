@@ -44,25 +44,25 @@ The system features three primary wearable components that players use during ga
 *Figure: The above figure showcases the placement of the sensors we utilized on the players wearables*
 
 1. **Gun Assembly**
-   - Equipped with IR transmitters
-   - Integrated bullet count display
-   - Provides real-time ammunition feedback
+   - Equipped with IR transmitters.
+   - Integrated bullet count display.
+   - Provides real-time ammunition feedback.
 
 ![Gun Component Layout](./Image_Assets/gun_layout.png)
 *Figure: Detailed gun assembly showing IR transmitter placement and display integration*
 
 2. **Tactical Vest**
-   - Features IR receivers for shot detection
-   - Includes HP display for health monitoring
-   - Strategic sensor placement for optimal detection
+   - Features IR receivers for shot detection.
+   - Includes HP display for health monitoring.
+   - Strategic sensor placement for optimal detection.
 
 ![Vest Component Layout](./Image_Assets/vest_layout.png)
 *Figure: Vest design showing IR receiver placement and display mounting points*
 
 3. **Smart Glove**
-   - Integrated motion sensors
-   - Enables gesture detection
-   - Provides real-time movement data
+   - Integrated motion sensors.
+   - Enables gesture detection.
+   - Provides real-time movement data.
 ![Action Glove Component Layout](./Image_Assets/action_glove_layout.png)
 *Figure: Action glove design showing MPU and bluno beetle microcontroller placement*
 
@@ -74,67 +74,67 @@ The system implements a sophisticated multi-process architecture on the Ultra96 
 This primary process manages all hardware component communications through several child processes:
 
 1. **Update Beetles (Child Process 1)**
-   - Manages socket connections for player equipment
-   - Handles real-time updates of bullet counts and HP
-   - Ensures synchronization between components
+   - Manages socket connections for player equipment.
+   - Handles real-time updates of bullet counts and HP.
+   - Ensures synchronization between components.
 
 2. **Component Handlers (Child Processes 2-7)**
    Each handler process manages a specific component type:
    - **Gun Handler**: 
-     - Processes shooting actions
-     - Updates ammunition counts
-     - Manages trigger events
+     - Processes shooting actions.
+     - Updates ammunition counts.
+     - Manages trigger events.
    
    - **Vest Handler**:
-     - Detects and processes hit registration
-     - Updates player health status
-     - Manages damage calculations
+     - Detects and processes hit registration.
+     - Updates player health status.
+     - Manages damage calculations.
    
    - **Glove Handler**:
-     - Processes motion data at 20Hz
-     - Forwards data to HW Accelerator
-     - Manages gesture recognition pipeline
+     - Processes motion data at 20Hz.
+     - Forwards data to HW Accelerator.
+     - Manages gesture recognition pipeline.
 
 3. **Hardware Accelerator (Child Processes 8-9)**
-   - Dedicated process per player
-   - Handles gesture recognition acceleration
-   - Manages hardware-level motion processing
+   - Dedicated process per player.
+   - Handles gesture recognition acceleration.
+   - Manages hardware-level motion processing.
 
 #### Process 2: Game Engine
 The central game logic coordinator responsible for:
-- Maintaining current game state
-- Processing player actions from action_queue
-- Updating game signals based on events
-- Communicating with evaluation server
-- Managing hardware component state updates
+- Maintaining current game state.
+- Processing player actions from action_queue.
+- Updating game signals based on events.
+- Communicating with evaluation server.
+- Managing hardware component state updates.
 
 #### Process 3: Eval Client
 Handles all evaluation server communications:
-- Implements AES encryption for data security
-- Manages game state verification
-- Processes server responses
-- Updates game engine with verified states
+- Implements AES encryption for data security.
+- Manages game state verification.
+- Processes server responses.
+- Updates game engine with verified states.
 
 #### Process 4: MQTT Client
 Manages real-time communication through:
-- HiveMQ broker connection management
-- Subscription to "LaserTag/OppInFrame" topic
-- Game state publishing to "LaserTag/GameState"
-- Real-time visualizer updates
+- HiveMQ broker connection management.
+- Subscription to "LaserTag/OppInFrame" topic.
+- Game state publishing to "LaserTag/GameState".
+- Real-time visualizer updates.
 
 #### Process 5: Console Interface
 Provides system monitoring through:
-- Real-time component status display
-- Action history tracking
-- Game state visualization
-- System log management
+- Real-time component status display.
+- Action history tracking.
+- Game state visualization.
+- System log management.
 
 ### Inter-Process Communication
 The system utilizes multiple communication mechanisms:
-- Multiprocessing queues for asynchronous data transfer
-- Shared arrays for real-time state management
-- Socket connections for external communications
-- MQTT for visualization updates
+- Multiprocessing queues for asynchronous data transfer.
+- Shared arrays for real-time state management.
+- Socket connections for external communications.
+- MQTT for visualization updates.
 ![Console Interface Diagram](./Image_Assets/console_interface.png)
 *Figure: Inter-process communication showcased in the console interface*
 
@@ -197,9 +197,9 @@ Here are the main components used in the system:
 
 ### Libraries and Implementation
 The system uses the following libraries in C++:
-1. Glove: `<Wire.h>` and `<MPU6050.h>` for I2C communication
-2. Gun: `<IRremote.hpp>` for IR signal transmission
-3. Vest: `<IRremote.h>` and `<TM1637Display.h>` for IR reception and display
+1. Glove: `<Wire.h>` and `<MPU6050.h>` for I2C communication.
+2. Gun: `<IRremote.hpp>` for IR signal transmission.
+3. Vest: `<IRremote.h>` and `<TM1637Display.h>` for IR reception and display.
 
 ### Circuit Schematics
 ![Connection Between Bluno Beetle and MPU Sensor](./Image_Assets/conn_beetle_mpu.png)
@@ -214,19 +214,19 @@ The system uses the following libraries in C++:
 ### Implementation Details
 
 #### Glove Implementation
-- Uses I2C communication through Wire.h
-- Extracts X, Y, Z axes data from MPU6050 for both accelerometer and gyroscope
-- Combines two registers per axis to get correct values
+- Uses I2C communication through Wire.h.
+- Extracts X, Y, Z axes data from MPU6050 for both accelerometer and gyroscope.
+- Combines two registers per axis to get correct values.
 
 #### Gun Implementation
-- Emits unique IR signals per player using `IRSender.sendNEC(address,command,repeats)`
-- Piezo buzzer provides audio feedback for successful shots and empty ammo
+- Emits unique IR signals per player using `IRSender.sendNEC(address,command,repeats)`.
+- Piezo buzzer provides audio feedback for successful shots and empty ammo.
 
 #### Vest Implementation
-- Constantly receives and decodes IR signals using `IrReceiver.decode()`
-- Validates signals based on player-specific commands
-- Updates health display on TM1637
-- Provides audio feedback for successful hit registration
+- Constantly receives and decodes IR signals using `IrReceiver.decode()`.
+- Validates signals based on player-specific commands.
+- Updates health display on TM1637.
+- Provides audio feedback for successful hit registration.
 
 #### Issues and Solutions
 A key issue encountered during integration was the vest's inability to simultaneously receive data from both Serial (bluetooth) and IR Receiver. This was resolved by reinitializing the IR Receiver after bluetooth data reception using `IrReceiver.begin(IR_RCV_PIN)`.
@@ -241,11 +241,11 @@ The hardware AI component represents a sophisticated sub-system designed to proc
 
 The implementation process utilizes Vivado HLS to transform C++ code into RTL code through these essential steps:
 
-1. Building the neural network in C++
-2. Verifying the code through the C-simulation in Vivado HLS
-3. Executing C-synthesis
-4. Verifying the kernel through RTL simulation
-5. Reviewing synthesis and co-simulation reports
+1. Building the neural network in C++.
+2. Verifying the code through the C-simulation in Vivado HLS.
+3. Executing C-synthesis.
+4. Verifying the kernel through RTL simulation.
+5. Reviewing synthesis and co-simulation reports.
 
 ![Final block design showing the neural network IP and peripheral IPs with AXI DMA connections](./Image_Assets/ip_block_diagram_axi_dma.png)
 *Figure: Final block design showing the neural network IP and peripheral IPs with AXI DMA connections*
@@ -254,10 +254,10 @@ The implementation process utilizes Vivado HLS to transform C++ code into RTL co
 
 The system begins with data collection from an MPU6050 sensor mounted on the player's glove, sampling at 20Hz to capture six fundamental measurements: three-axis acceleration and three-axis gyroscopic data. The move detection algorithm processes this continuous data stream using a sliding window approach to identify meaningful actions:
 
-- Window Size: 8 data points covering 0.4 seconds
-- Energy Calculation: Computes total movement energy within each window
-- Movement Detection: Identifies significant energy changes between consecutive windows
-- Action Capture: Records 30 subsequent data points (1.5 seconds) from the data stream when movement is detected
+- Window Size: 8 data points covering 0.4 seconds.
+- Energy Calculation: Computes total movement energy within each window.
+- Movement Detection: Identifies significant energy changes between consecutive windows.
+- Action Capture: Records 30 subsequent data points (1.5 seconds) from the data stream when movement is detected.
 
 ![Energy Formula](./Image_Assets/energy_formula.png)
 *Figure: Energy formula*
@@ -285,10 +285,10 @@ The system initially generates 60 features (6 measurements × 10 statistical fea
 
 The system employs a Multi-layer Perceptron (MLP) architecture, chosen for its optimal balance of performance and implementation complexity:
 
-- Input layer: 16 nodes (receiving the processed features)
-- Hidden layer: 32 nodes (determined through hyperparameter tuning)
-- Output layer: 5 nodes (representing idle, shield, grenade, reload, and logout actions)
-- Activation functions: Leaky ReLU for hidden layer and Softmax for output layer
+- Input layer: 16 nodes (receiving the processed features).
+- Hidden layer: 32 nodes (determined through hyperparameter tuning).
+- Output layer: 5 nodes (representing idle, shield, grenade, reload, and logout actions).
+- Activation functions: Leaky ReLU for hidden layer and Softmax for output layer.
 
 ![MLP Design](./Image_Assets/mlp_design.png)
 *Figure: MLP Design*
@@ -298,32 +298,32 @@ The system employs a Multi-layer Perceptron (MLP) architecture, chosen for its o
 The system achieves impressive performance metrics across several key areas:
 
 #### Timing and Latency
-- Timing: 4.056ns
-- Significantly reduced latency through function pipelining
+- Timing: 4.056ns.
+- Significantly reduced latency through function pipelining.
 ![Timing and Latency Metrics](./Image_Assets/timing_and_latency.png)
 *Figure: Timing and Latency Metrics*
 
 #### Power Consumption
-- Final design power: 2.172W
-![Power Consumption Metrics](./Image_Assets/hw_ai_power_consumption.png)
+- Final design power: 2.172W.
+![Power Consumption Metrics](./Image_Assets/hw_ai_power_consumption.png).
 *Figure: Power Consumption*
 
 
 #### Resource Utilization
-- Hardware resource utilization remains efficient at <25% for most components
-![Resource Utilization Estimates](./Image_Assets/hw_resource_utilization.png)
+- Hardware resource utilization remains efficient at <25% for most components.
+![Resource Utilization Estimates](./Image_Assets/hw_resource_utilization.png).
 *Figure: Resource Utilization Metrics*
 
 ### Key Improvements
 
 Throughout development, several crucial enhancements optimized system performance:
 
-1. Correction of AXI DMA buffer size to handle 45 features
-2. Implementation of sophisticated feature selection and dimensionality reduction
-3. Addition of balanced accuracy metrics for handling imbalanced datasets
-4. Optimization of pipeline latency through function pipelining
-5. Seamless integration with the game engine through queue-based data handling
-6. Fine-tuning of move detection parameters for optimal gesture recognition
+1. Correction of AXI DMA buffer size to handle 45 features.
+2. Implementation of sophisticated feature selection and dimensionality reduction.
+3. Addition of balanced accuracy metrics for handling imbalanced datasets.
+4. Optimization of pipeline latency through function pipelining.
+5. Seamless integration with the game engine through queue-based data handling.
+6. Fine-tuning of move detection parameters for optimal gesture recognition.
 
 The hardware AI component successfully combines efficient data collection, sophisticated feature engineering, and neural network classification to provide accurate, real-time action recognition. The careful balance between all system components ensures responsive and accurate gameplay while maintaining efficient resource utilization and power consumption. The shift from CNN to MLP, coupled with the sophisticated data processing pipeline, has created a robust system capable of meeting the demanding requirements of real-time gesture recognition in the laser tag game environment.
 
@@ -334,22 +334,22 @@ The hardware AI component successfully combines efficient data collection, sophi
 ### Thread Management (Section 5.1)
 Each player has a dedicated relay node to avoid pipeline congestion. The threads are distributed as follows:
 
-- Thread-0 and Thread-3: Managing gun Bluno Beetle data for shot detection during gameplay
-- Thread-1 and Thread-4: Managing vest Bluno Beetle data for damage detection during gameplay
-- Thread-2 and Thread-5: Managing glove Bluno Beetle data for IMU data from action glove for action classification during gameplay
+- Thread-0 and Thread-3: Managing gun Bluno Beetle data for shot detection during gameplay.
+- Thread-1 and Thread-4: Managing vest Bluno Beetle data for damage detection during gameplay.
+- Thread-2 and Thread-5: Managing glove Bluno Beetle data for IMU data from action glove for action classification during gameplay.
 
 ### BLE Interface (Section 5.2)
 
 #### MAC Address Management
-- MAC addresses of beetles are hardcoded into relay nodes rather than using BLE's advertising capability
-- Enables direct connection initiation when beetles are within range
-- Active monitoring of connection status with automatic reconnection procedures
-- Eliminates need for device discovery, improving connection speed, reliability, and most importantly the incorporating the Real-Time nature of the system
+- MAC addresses of beetles are hardcoded into relay nodes rather than using BLE's advertising capability.
+- Enables direct connection initiation when beetles are within range.
+- Active monitoring of connection status with automatic reconnection procedures.
+- Eliminates need for device discovery, improving connection speed, reliability, and most importantly the incorporating the Real-Time nature of the system.
 
 #### Connection Protocol Implementation
-- Uses connection-oriented protocols requiring reliable connection establishment
-- Implements handshake mechanism for connection verification
-- Requires successful connection verification before any data transmission
+- Uses connection-oriented protocols requiring reliable connection establishment.
+- Implements handshake mechanism for connection verification.
+- Requires successful connection verification before any data transmission.
 
 ### Protocol Design Implementation 
 
@@ -366,7 +366,7 @@ Each player has a dedicated relay node to avoid pipeline congestion. The threads
 | Data-Acknowledgement | D | Packet sent from relay node to beetle to confirm the data for transmitted by the beetle was received successfully |
 
 ### Packet Format
-- Maximum Transmission Unit: 27 bytes (20 bytes used for transmission)
+- Maximum Transmission Unit: 27 bytes (20 bytes used for transmission).
 
 | Packet Component | Data-Type | Memory Size | Description |
 |-----------|-----------|------|-------------|
@@ -403,17 +403,17 @@ Each player has a dedicated relay node to avoid pipeline congestion. The threads
 
 The data transmission follows ARQ (Automatic Repeat Request) protocol:
 1. **Initial Transmission**
-  - Beetle sends data packet with sequence number and checksum
-  - Relay node verifies packet integrity
+  - Beetle sends data packet with sequence number and checksum.
+  - Relay node verifies packet integrity.
 
 2. **Acknowledgment Phase**
-  - If packet valid: Relay node sends Data-Acknowledgement (D)
-  - If packet invalid/lost: Beetle timeout triggers retransmission
+  - If packet valid: Relay node sends Data-Acknowledgement (D).
+  - If packet invalid/lost: Beetle timeout triggers retransmission.
 
 3. **Data Processing**
-  - After acknowledgment, relay node processes data
-  - Data forwarded to next stage in pipeline
-  - Beetle prepares next data packet if available
+  - After acknowledgment, relay node processes data.
+  - Data forwarded to next stage in pipeline.
+  - Beetle prepares next data packet if available.
 
 #### Relay Node Class Structure
 ![UML Diagram for Relay Node Data Transmission Classes](./Image_Assets/uml_ble_relay_node.png)
@@ -421,52 +421,52 @@ The data transmission follows ARQ (Automatic Repeat Request) protocol:
 
 - Core Classes:
   1. **BlunoDevice (Base Class)**
-     - Handles data transmission via `transmission_protocol()`
-     - Manages connections through `handshake_mechanism()`
-     - Maintains connection flags and states
+     - Handles data transmission via `transmission_protocol()`.
+     - Manages connections through `handshake_mechanism()`.
+     - Maintains connection flags and states.
   2. **BluetoothInterfaceHandler**
-     - Parses received data packets via `handleNotifications()`
-     - Forwards data to Ultra-96
-     - Controls acknowledgement flags
+     - Parses received data packets via `handleNotifications()`.
+     - Forwards data to Ultra-96.
+     - Controls acknowledgement flags.
 
 Data Flow:
-- Upward: Beetle → Relay Node Parent Process and Respective Child Processes → Hardware AI
-- Downward: Hardware AI → Relay Node Parent Process and Respective Child Processes → Beetle
+- Upward: Beetle → Relay Node Parent Process and Respective Child Processes → Hardware AI.
+- Downward: Hardware AI → Relay Node Parent Process and Respective Child Processes → Beetle.
 
 #### Component Protocol Classes
 ![UML Diagram for Data Transimssion Classes for different protocols associated with the Gun, Vest, and Action Glove](./Image_Assets/uml_ble_hardware.png)
 *UML Diagram for Data Transimssion Classes for different protocols associated with the Gun, Vest, and Action Glove*
 
 ##### Gun Protocol
-- Manages shot detection and transmission
-- Handles trigger events and validation
-- Synchronizes bullet count
+- Manages shot detection and transmission.
+- Handles trigger events and validation.
+- Synchronizes bullet count.
 
 ##### Vest Protocol
-- Handles hit detection and health points
-- Manages damage calculation
-- Updates seven-segment display
+- Handles hit detection and health points.
+- Manages damage calculation.
+- Updates seven-segment display.
 
 ##### Action Glove with IMU Protocol
-- Continuous sampling at 20Hz
-- Handles float-to-int scaling
-- Processes acceleration and gyroscope data
+- Continuous sampling at 20Hz.
+- Handles float-to-int scaling.
+- Processes acceleration and gyroscope data.
 
 ##### Common Protocol Features
 1. **Data Processing**
-   - Checksum calculation
-   - Encoding/decoding methods
-   - Sequence number management
+   - Checksum calculation.
+   - Encoding/decoding methods.
+   - Sequence number management.
 
 2. **State Management**
-   - Individual state machines
-   - Event-based transitions
-   - Error handling and recovery
+   - Individual state machines.
+   - Event-based transitions.
+   - Error handling and recovery.
 
 3. **Communication**
-   - Consistent packet formatting
-   - Acknowledgment system
-   - Error handling and retries
+   - Consistent packet formatting.
+   - Acknowledgment system.
+   - Error handling and retries.
 
 
 #### State Management and State Transitions during Data-Transmission
@@ -489,20 +489,20 @@ Data Flow:
    - Range: -255 to +255 scaled to -32,768 to +32,767
 
 ### Packet Fragmentation and Data Rate Management
-- Each beetle thread has dedicated receiving buffer
-- 20-byte minimum read requirement to prevent incomplete packet processing
-- Handles high data rates through buffer management
+- Each beetle thread has dedicated receiving buffer.
+- 20-byte minimum read requirement to prevent incomplete packet processing.
+- Handles high data rates through buffer management.
 
 ### Disconnection Management and Reconnection
-- Clears all conditional flags upon disconnection
-- Attempts reconnection through handshake mechanism
-- Repeats until successful reconnection
+- Clears all conditional flags upon disconnection.
+- Attempts reconnection through handshake mechanism.
+- Repeats until successful reconnection.
 
 ### Integration Issues
 Required startup sequence:
-1. Start Ultra96.py and Eval.py code
-2. Start player relay nodes
-3. Power on beetles
+1. Start Ultra96.py and Eval.py code.
+2. Start player relay nodes.
+3. Power on beetles.
 
 ---
 
@@ -528,9 +528,9 @@ The communication utilizes TCP/IP socket connections via Python's socket library
 
 Key characteristics:
 
-- Uses TCP/IP socket programming with Ultra96 as server
-- Requires setup through stu.comp.nus.edu.sg network
-- SSH tunnel needed for laptop-Ultra96 communication
+- Uses TCP/IP socket programming with Ultra96 as server.
+- Requires setup through stu.comp.nus.edu.sg network.
+- SSH tunnel needed for laptop-Ultra96 communication.
 
 Connection Structure:
 | Component | Details |
@@ -549,20 +549,20 @@ Communication Protocol:
 | 'hit' | Signal from vest |
 | JSON | IMU data from relay node that was transmitted to it from a player's action glove |
 
-[Placeholder for Connection Architecture Diagram]
+<!--[Placeholder for Connection Architecture Diagram]-->
 
 ### Concurrency Implementation
 
 1. On Relay Nodes:
-   - Uses threading
-   - 3 threads per player for component communication
-   - Handles bidirectional communication
+   - Uses threading.
+   - 3 threads per player for component communication.
+   - Handles bidirectional communication.
 
 2. On Ultra96:
-   - Uses multiprocessing
-   - Multiple threads for game functions
-   - Child processes within Relay Server
-   - Maintains component connections from Relay Nodes
+   - Uses multiprocessing.
+   - Multiple threads for game functions.
+   - Child processes within Relay Server.
+   - Maintains component connections from Relay Nodes.
 
 ### Communication between Ultra96 and Visualizer
 
@@ -584,19 +584,124 @@ Uses Message Queue Telemetry Transport (MQTT) protocol:
 ### Key Technical Features
 
 1. Security:
-   - AES encryption for evaluation server communication
-   - Private MQTT broker
-   - Secure network routing through NUS network
+   - AES encryption for evaluation server communication.
+   - Private MQTT broker.
+   - Secure network routing through NUS network.
 
 2. Performance:
-   - Multiprocessing for parallel operation
-   - Efficient message queuing
-   - Regular state updates
+   - Multiprocessing for parallel operation.
+   - Efficient message queuing.
+   - Regular state updates.
 
 3. Reliability:
-   - Connection status monitoring
-   - Component-specific connections
-   - Regular frame presence updates
+   - Connection status monitoring.
+   - Component-specific connections.
+   - Regular frame presence updates.
 
 ---
+## AR User Interface and Game Engine Summary
 
+### Initial Design and User Survey
+- This following image highlights the initial design, quickly prototyped in the early stages of the project, providing a foundational UI for us to build upon.
+![Initial User Interface Design](./Image_Assets/viz_initial_ui_design.png)
+*Initial visualizer design mockup showing health bar and player stats anchored on opponent*
+
+### User Survey Demographics and Results
+- The following chard 
+![Demographics chart of survey respondents](./Image_Assets/viz_user_surveys.png)
+*Demographics chart of survey respondents*
+
+- Key Findings from Survey (33 responses):
+  1. 75% of users preferred health bars at top left and right positions.
+  1. Users favored enemy stats fixed to absolute screen positions rather than anchored to opponent.
+  1. Survey included diverse demographics across gender, profession, and university majors.
+
+- Based on the findings from the surveys conducted the the user interface was modified into the following design:
+![Final visualizer design implementation showing revised layout based on survey feedback](./Image_Assets/viz_final_ui_design.png)
+*Final visualizer design implementation showing revised layout based on survey feedback*
+
+### Design Constraints and Issues
+
+#### Initial Design Constraints:
+- Health bar and stats anchoring on opponent player.
+- Frame size limitations affecting health bar placement when opponent is at screen edges.
+
+#### Implementation Issues:
+- Shield Anchoring Problems:
+   1. Initial incorrect game object assignment.
+   1. Shield flickering due to multiple game object assignments.
+   1. Flag toggling issues causing repeated appear/disappear cycles.
+
+### Software Architecture
+
+#### Framework Choice:
+- Unity with Vuforia for AR.
+- Selected over ARFoundation due to better ImageTarget detection range and reliability.
+
+#### Key Modules:
+
+1. AR_Manager
+   - Purpose: Manages AR effects for both players.
+   - Functions: 
+     - Controls game objects for AR effects.
+     - Manages boolean flags for MQTT actions.
+   
+2. UI_Manager
+   - Purpose: Manages user interface elements.
+   - Components:
+     - Health display
+     - Ammunition count
+     - Shield/grenade status
+   
+3. NotificationManager
+   - Purpose: Handles in-game notifications.
+   - Features: Text-based action verification system.
+
+### Phone Sensor Implementation
+- Primary sensor: Phone gyroscope.
+- Used for: Device orientation recognition and AR element anchoring.
+
+### UI Implementation
+![Canvas overlay showing scoreboard and game objects](./Image_Assets/viz_canvas_overlay.png)
+*Canvas overlay showing scoreboard and game objects*
+
+Asset Creation Sources:
+- Basic elements: Created in Figma, exported as PNG.
+- Detailed assets: Unity Asset Store and free online sources.
+- File formats: .PNG, .fbx, prefabs.
+
+### MQTT Components
+
+MQTT Architecture Components:
+
+| Component | Primary Function |
+|-----------|-----------------|
+| MQTT_Processor | Processes game state updates and manages scene changes |
+| MQTT_Client | Establishes broker connection and topic subscriptions |
+| MQTT_Sender | Handles message publishing to topics |
+| MQTTReceiver | Manages incoming messages from subscribed topics |
+
+### Game Engine Algorithm Design
+
+Game Engine Algorithm Flow:
+1. Action queue monitoring for player inputs.
+2. Connection handling for gun/vest components.
+3. Action signal processing (shoot, grenade, shield, reload).
+4. Hit detection and verification.
+5. Game state calculation and updates.
+6. Communication with Eval Server.
+7. Visualizer User Interface updates.
+8. Component status updates (bullets, health).
+
+Key Features:
+- Signals dictionary for action tracking.
+- Action queue for player input management.
+- Half-second delay on shoot actions for hit verification.
+- Integrated communication with visualizer and Eval Server.
+
+Implementation Notes:
+- Uses multiprocessing for handling multiple player actions.
+- Maintains synchronized game state across all components.
+- Real-time updates for player stats and game status.
+
+---
