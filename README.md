@@ -95,7 +95,7 @@ This primary process manages all hardware component communications through sever
      - Forwards data to HW Accelerator
      - Manages gesture recognition pipeline
 
-3. **HW Accelerator (Child Processes 8-9)**
+3. **Hardware Accelerator (Child Processes 8-9)**
    - Dedicated process per player
    - Handles gesture recognition acceleration
    - Manages hardware-level motion processing
@@ -503,4 +503,100 @@ Required startup sequence:
 1. Start Ultra96.py and Eval.py code
 2. Start player relay nodes
 3. Power on beetles
+
+---
+
+## Network Orchastration and System Infrastructure
+
+### Communication between Ultra96 and Evaluation Server
+
+The communication utilizes TCP/IP socket connections via Python's socket library. Key aspects:
+
+- Evaluation Server acts as server listening to incoming packages from Ultra96 (client).
+- Uses Advanced Encryption Standard (AES) with Cipher Block Chaining (CBC) mode.
+- Implements Crypto.Cipher.AES class with padding using Crypto.Util.Padding.
+- Process flow:
+  1. Server starts and listens for connections.
+  2. Ultra96 connects using IP address and port number.
+  3. Game engine sends encoded messages to server.
+  4. Server decrypts messages using shared encryption key.
+  5. Messages received as JSON strings.
+  6. Actual game state returned from eval server.
+  7. GameEngine updates internal state and sends to Visualiser via MQTTClient.
+
+### Communication between Ultra96 and Laptops
+
+Key characteristics:
+
+- Uses TCP/IP socket programming with Ultra96 as server
+- Requires setup through stu.comp.nus.edu.sg network
+- SSH tunnel needed for laptop-Ultra96 communication
+
+Connection Structure:
+| Component | Details |
+|-----------|----------|
+| Total Connections | 6 separate connections |
+| Relay Nodes | 2 nodes (3 connections each per player) |
+| Connection Setup | At start of Relay Node |
+| Setup Time | Up to 10s per reconnection |
+
+Communication Protocol:
+| Signal | Purpose |
+|--------|----------|
+| 'start' | Successful handshake |
+| 'end' | Bluetooth disconnection |
+| 'shoot' | Validation packet from gun beetle |
+| 'hit' | Signal from vest |
+| JSON | IMU data from relay node that was transmitted to it from a player's action glove |
+
+[Placeholder for Connection Architecture Diagram]
+
+### Concurrency Implementation
+
+1. On Relay Nodes:
+   - Uses threading
+   - 3 threads per player for component communication
+   - Handles bidirectional communication
+
+2. On Ultra96:
+   - Uses multiprocessing
+   - Multiple threads for game functions
+   - Child processes within Relay Server
+   - Maintains component connections from Relay Nodes
+
+### Communication between Ultra96 and Visualizer
+
+Uses Message Queue Telemetry Transport (MQTT) protocol:
+
+- Broker: Private HiveMQ for secure connection
+- Topics:
+  | Topic | Purpose | Direction |
+  |-------|----------|-----------|
+  | LaserTag/GameState | Updated game state | Ultra96 → Visualizer |
+  | LaserTag/OppInFrame | Player frame presence | Visualizer → Ultra96 |
+
+- Frame updates occur at 5-second intervals
+- Uses JSON format similar to evaluation server communication
+- Frame presence information used for grenade hit detection
+
+<!-- [Placeholder for MQTT Communication Flow Diagram] -->
+
+### Key Technical Features
+
+1. Security:
+   - AES encryption for evaluation server communication
+   - Private MQTT broker
+   - Secure network routing through NUS network
+
+2. Performance:
+   - Multiprocessing for parallel operation
+   - Efficient message queuing
+   - Regular state updates
+
+3. Reliability:
+   - Connection status monitoring
+   - Component-specific connections
+   - Regular frame presence updates
+
+---
 
