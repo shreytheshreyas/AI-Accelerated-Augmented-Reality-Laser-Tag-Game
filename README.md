@@ -506,7 +506,7 @@ Required startup sequence:
 
 ---
 
-## Network Orchastration and System Infrastructure
+## Network Orchastration and System Infrastructure Design and Implementation
 
 ### Communication between Ultra96 and Evaluation Server
 
@@ -599,7 +599,7 @@ Uses Message Queue Telemetry Transport (MQTT) protocol:
    - Regular frame presence updates.
 
 ---
-## AR User Interface and Game Engine Summary
+## Augmented Reality User Interface and Game Engine Design and Implementation
 
 ### Initial Design and User Survey
 - This following image highlights the initial design, quickly prototyped in the early stages of the project, providing a foundational UI for us to build upon.
